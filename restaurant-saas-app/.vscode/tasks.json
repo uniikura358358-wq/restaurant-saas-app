@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Auto Start Dev Server",
+            "type": "npm",
+            "script": "dev",
+            "runOptions": {
+                "runOn": "folderOpen" // 📂 これが「初期状態セット」の正体です
+            },
+            "options": {
+                "cwd": "${workspaceFolder}" // 🎯 修正点：今の場所で実行する
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false
+            }
+        }
+    ]
+}
