@@ -84,6 +84,22 @@ export async function POST(request: Request) {
             );
         }
 
+        // 5. Google Business Profile に返信を投稿 (Best Effort)
+        // google_review_id がある場合のみ実行
+        if (updatedData.google_review_id) {
+            try {
+                // google-business-profile.ts から import 必要
+                const { replyToReview } = await import("@/lib/google-business-profile");
+                await replyToReview(updatedData.google_review_id, replyContent);
+                console.log(`Posted reply to Google for review ${updatedData.google_review_id}`);
+            } catch (googleError) {
+                console.error("Failed to post reply to Google:", googleError);
+                // Googleへの投稿失敗はクライアントにエラーとして返さない（DB保存は成功しているため）
+                // ただし、UI側で「Googleへの反映に失敗しました」と出すなら status を 'google_sync_failed' とかにする手もあるが
+                // 今回はログ出力に留める
+            }
+        }
+
         return NextResponse.json({ success: true, review: updatedData });
     } catch (error: unknown) {
         let message = "返信の保存中にエラーが発生しました";

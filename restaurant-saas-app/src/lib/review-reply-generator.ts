@@ -26,7 +26,7 @@ export function buildGeneratorPrompt(params: GenerateReplyParams): string {
   const emojiInstructions = [
     "絵文字は一切使用しないでください。",
     "文末に1つか2つ、控えめに絵文字を使用してください。",
-    "文章の途中で適度に絵文字（😊, ✨, 🍽️など）を3〜5個程度使用し、親しみやすさを出してください。",
+    "丁寧な文章の中にも、必ず3〜5個程度の絵文字（😊, ✨, 🍽️など）を交ぜて、親しみやすさを演出してください。",
     "絵文字（😍, 🎉, 💖, 🌈など）を多用（6個以上）し、非常に明るく華やかで感情豊かな文章にしてください。"
   ][config.emoji_level] || "";
 
@@ -45,9 +45,9 @@ export function buildGeneratorPrompt(params: GenerateReplyParams): string {
 # 制約事項:
 - 文章トーン: ${toneInstructions[config.ai_tone] || toneInstructions.polite}
 - 絵文字ルール: ${emojiInstructions}
-- 署名: 文末に必ず「${config.default_signature}」を含めてください。
+- 署名: 文末に必ず「${config.default_signature || "店長"}」を含めてください。
 - 禁止事項: 嘘（提供していないサービス、割引など）を勝手に書かないでください。
-- 構造: テンプレートの文章をベースに、指定された絵文字レベルに応じて**絵文字を適宜挿入・装飾**しながら、口コミの内容に具体的に触れて感謝や改善を伝えてください。
+- 構造: テンプレートの文章をベースに、指定された絵文字レベルに応じて**必ず絵文字を挿入**し、口コミの内容に具体的に触れて感謝や改善を伝えてください。
 
 # 返信の核となる文章 (テンプレート):
 ${baseText}

@@ -13,6 +13,8 @@ import {
     CheckCircle2,
     BellRing,
     ShieldCheck,
+    ArrowRight,
+    Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,9 +135,17 @@ function AccountSettingsContent() {
     useEffect(() => {
         const verified = searchParams.get("verified");
         const verifyError = searchParams.get("verify_error");
+        const success = searchParams.get("success");
 
         if (verified === "email") toast.success("メールアドレスが確認されました ✅");
         else if (verified === "sms") toast.success("電話番号が確認されました ✅");
+
+        if (success === "true") {
+            toast.success("プランのアップグレードが完了しました！ 🎉", {
+                description: "すべての機能をご利用いただけます。ありがとうございます！",
+                duration: 8000,
+            });
+        }
 
         if (verifyError === "expired_token") toast.error("確認リンクの有効期限が切れています。");
         else if (verifyError === "invalid_token") toast.error("確認リンクが無効です。");
@@ -409,6 +419,32 @@ function AccountSettingsContent() {
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-2">
                                     残りの送信可能数: {smsUsage.remaining}通
+                                </div>
+                                <div className="mt-4 pt-4 border-t space-y-4">
+                                    <div
+                                        onClick={() => window.location.href = '/settings/account/upgrade'}
+                                        className="relative overflow-hidden p-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg cursor-pointer hover:shadow-xl transition-all group"
+                                    >
+                                        <div className="absolute top-0 right-0 p-8 bg-white/10 rounded-full -mr-4 -mt-4 group-hover:scale-110 transition-transform"></div>
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-2 text-xs font-bold bg-white/20 px-2 py-0.5 rounded w-fit mb-2 border border-white/30">
+                                                <Sparkles className="w-3 h-3" /> HP制作会員様限定
+                                            </div>
+                                            <h4 className="font-black text-lg">特別グレードアッププラン</h4>
+                                            <p className="text-[10px] text-blue-100 mt-1">維持管理費込の特別セット価格をご用意しました</p>
+                                            <div className="mt-3 flex items-center text-xs font-bold gap-1 underline underline-offset-4">
+                                                プランを確認する <ArrowRight className="w-3 s-3" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        variant="outline"
+                                        className="w-full text-gray-400 border-gray-100 hover:bg-gray-50 text-xs"
+                                        onClick={() => window.location.href = '/plans'}
+                                    >
+                                        通常プランの一覧を見る
+                                    </Button>
                                 </div>
                             </div>
                         </CardContent>

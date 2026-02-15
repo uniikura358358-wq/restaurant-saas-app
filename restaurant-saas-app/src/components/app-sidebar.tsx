@@ -56,6 +56,15 @@ export function AppSidebar({ activePage }: AppSidebarProps) {
                     <User className="size-4" />
                     <span>アカウント設定</span>
                 </Link>
+                <Link
+                    href="/plans"
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground mt-4 border-t pt-4"
+                >
+                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-[8px] text-white font-bold">
+                        UP
+                    </span>
+                    <span>プラン変更</span>
+                </Link>
             </nav>
             <div className="px-6 py-4 text-[10px] text-muted-foreground border-t opacity-50">
                 Professional Edition v1.0

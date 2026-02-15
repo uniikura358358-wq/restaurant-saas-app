@@ -232,6 +232,14 @@ export default function GinzaRamenPage() {
                 transition={{ delay: 2, duration: 0.5 }}
                 className="fixed bottom-0 left-0 right-0 bg-[#fcfaf7]/95 backdrop-blur-md border-t border-[#e5e0d8] p-4 md:p-6 z-50 flex items-center justify-between md:justify-center md:gap-12 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]"
             >
+                {/* PLAN BACK BUTTON (Added for SaaS Demo Flow) */}
+                <button
+                    onClick={() => window.close()} // Try close first, or fallback to navigation if blocked
+                    className="absolute left-4 top-[-60px] md:top-auto md:left-8 bg-white/90 backdrop-blur border border-gray-300 shadow-lg text-gray-700 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                >
+                    <span>← プラン選択に戻る</span>
+                </button>
+
                 <div className="hidden md:block text-[#5e5852] text-sm">
                     <span className="text-[#d4af37] mr-2">●</span>
                     只今の待ち時間：<span className="font-medium text-[#2c2825]">15分</span>

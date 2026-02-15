@@ -1,71 +1,67 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { signIn, signUp } from '../auth/actions'
+import { useState, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import { toast } from "sonner"
 
-// useSearchParamsを利用するため、Suspenseでラップした子コンポーネントを作成
 function LoginFormContent() {
-    const searchParams = useSearchParams()
+    const router = useRouter()
     const [isLogin, setIsLogin] = useState(true)
     const [loading, setLoading] = useState(false)
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
     const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null)
 
-    // 反証対策：URLパラメータからエラーを検知して通知（期限切れリンクなど）
-    useEffect(() => {
-        const errorCode = searchParams.get('error')
-        if (errorCode) {
-            let errorText = '認証に失敗しました。もう一度やり直してください。'
-
-            if (errorCode === 'expired_token') {
-                errorText = '認証リンクの期限が切れました。再度登録・ログインしてください。'
-            } else if (errorCode === 'network_error') {
-                errorText = '通信エラーが発生しました。接続を確認して再度お試しください。'
-            } else if (errorCode === 'auth_failed') {
-                errorText = '認証に失敗しました。リンクが無効、または既に使用されています。'
-            }
-
-            // eslint-disable-next-line
-            setMessage({ type: 'error', text: errorText })
-            toast.error(errorText)
-        }
-    }, [searchParams])
-
-    async function handleSubmit(formData: FormData) {
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault()
         setLoading(true)
         setMessage(null)
 
-        const result = isLogin ? await signIn(formData) : await signUp(formData)
+        try {
+            if (isLogin) {
+                await signInWithEmailAndPassword(auth, email, password)
+                toast.success('ログインしました')
+                router.push('/')
+            } else {
+                await createUserWithEmailAndPassword(auth, email, password)
+                toast.success('アカウントを作成しました')
+                router.push('/')
+            }
+        } catch (error: any) {
+            console.error(error)
+            let errorMessage = 'エラーが発生しました'
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                errorMessage = 'メールアドレスまたはパスワードが間違っています'
+            } else if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'このメールアドレスは既に使用されています'
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = 'パスワードは6文字以上で設定してください'
+            }
 
-        // TypeScriptの型ガード（'error' in result）を用いて安全にアクセス
-        if (result && 'error' in result && result.error) {
-            setMessage({ type: 'error', text: result.error })
-            toast.error(result.error)
-            setLoading(false)
-        } else if (result && 'success' in result && result.success) {
-            setMessage({ type: 'success', text: result.success })
-            toast.success(result.success)
+            setMessage({ type: 'error', text: errorMessage })
+            toast.error(errorMessage)
             setLoading(false)
         }
-        // ログイン成功時は actions.ts 内で redirect('/settings') が実行されるため、loadingは維持
     }
 
     return (
         <div className="space-y-6">
-            <form action={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="email">メールアドレス</Label>
                     <Input
                         id="email"
-                        name="email"
                         type="email"
                         required
                         placeholder="example@test.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         disabled={loading}
                     />
                 </div>
@@ -73,9 +69,11 @@ function LoginFormContent() {
                     <Label htmlFor="password">パスワード</Label>
                     <Input
                         id="password"
-                        name="password"
                         type="password"
                         required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
                     />
                 </div>
@@ -114,11 +112,14 @@ function LoginFormContent() {
                     {isLogin ? 'アカウントをお持ちでない方はこちら（新規登録）' : '既にアカウントをお持ちの方はこちら（ログイン）'}
                 </button>
             </div>
+
+            <div className="text-center text-xs text-gray-400 mt-4">
+                Powered by Firebase Auth
+            </div>
         </div>
     )
 }
 
-// メインコンポーネント：Next.jsの仕様に基づきSuspenseでラップ
 export default function LoginForm() {
     return (
         <Suspense fallback={
