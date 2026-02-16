@@ -1,21 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
-// サーバーサイド専用: service_role キーで RLS をバイパス
-function createAdminClient() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-        throw new Error("Supabase configuration is missing (URL or SERVICE_ROLE_KEY)");
-    }
-
-    return createClient(supabaseUrl, serviceRoleKey);
-}
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
     try {
-        const { reviewId } = await request.json();
+        const body = await request.json();
+        const { reviewId } = body;
+
+        // 1. Authentication
+        const authHeader = request.headers.get("Authorization");
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const idToken = authHeader.split("Bearer ")[1];
+
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(idToken);
+        } catch (e) {
+            console.error("Token verification failed:", e);
+            return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+        }
+        const uid = decodedToken.uid;
 
         if (!reviewId) {
             return NextResponse.json(
@@ -24,29 +32,52 @@ export async function POST(request: Request) {
             );
         }
 
-        const supabase = createAdminClient();
+        // 2. Ownership Check & Reset Status (Firestore)
+        const reviewRef = adminDb.collection("reviews").doc(reviewId);
+        const reviewDoc = await reviewRef.get();
 
-        const { error } = await supabase
-            .from("reviews")
-            .update({
-                status: "unreplied",
-                reply_content: null,
-                updated_at: new Date().toISOString()
-            })
-            .eq("id", reviewId);
+        if (!reviewDoc.exists) {
+            return NextResponse.json({ error: "Review not found" }, { status: 404 });
+        }
 
-        if (error) throw error;
+        const reviewData = reviewDoc.data();
+        if (reviewData?.userId && reviewData.userId !== uid) {
+            return NextResponse.json({ error: "Access denied" }, { status: 403 });
+        }
+
+        // 3. Reset Status
+        await reviewRef.update({
+            status: "unreplied",
+            replyContent: null,
+            replySummary: FieldValue.delete(),
+            replyId: FieldValue.delete(),
+            updatedAt: FieldValue.serverTimestamp()
+        });
+
+        // 4. Update Stats (Optional but recommended for consistency)
+        try {
+            const statsRef = adminDb.collection("users").doc(uid).collection("stats").doc("current");
+            await adminDb.runTransaction(async (t) => {
+                const statsDoc = await t.get(statsRef);
+                if (statsDoc.exists) {
+                    t.update(statsRef, {
+                        repliedCount: FieldValue.increment(-1),
+                        unrepliedCount: FieldValue.increment(1),
+                        updatedAt: FieldValue.serverTimestamp()
+                    });
+                }
+            });
+        } catch (statsError) {
+            console.warn("Stats update failed during reset:", statsError);
+            // Continue even if stats update fails
+        }
 
         return NextResponse.json({ success: true });
-    } catch (error: unknown) {
-        let message = "Failed to reset review status";
-        if (error instanceof Error) {
-            message = error.message;
-        } else if (error && typeof error === "object" && "message" in error) {
-            message = String((error as { message: unknown }).message);
-        }
+
+    } catch (error: any) {
+        console.error("Error in reset-status:", error);
         return NextResponse.json(
-            { error: message },
+            { error: "Failed to reset review status" },
             { status: 500 }
         );
     }

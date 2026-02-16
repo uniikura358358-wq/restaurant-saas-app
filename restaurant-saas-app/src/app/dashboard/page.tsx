@@ -1,157 +1,134 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { MessageCircle, Sparkles, Loader2, Copy, RotateCcw, CheckCircle, XCircle } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import supabase from "@/lib/supabase";
 import { ToastContainer, useToast } from "@/components/ui/toast-custom";
 import { AppSidebar } from "@/components/app-sidebar";
 import ReviewReplyButton from "@/components/review-reply-button";
-
-interface Review {
-  id: number;
-  author: string;
-  rating: number;
-  source: string;
-  content?: string;
-  comment?: string;
-  review_text?: string;
-  text?: string;
-  body?: string;
-  status: string;
-  reply_content?: string;
-  created_at: string;
-  updated_at?: string;
-}
+import { getDashboardStats, getReviews } from "@/app/actions/dashboard";
+import { DashboardStats, FirestoreReview } from "@/types/firestore";
 
 export default function DashboardPage() {
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const { user, loading: authLoading, getToken } = useAuth();
+  const router = useRouter();
+
+  // Stats State
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  // Reviews State
+  const [reviews, setReviews] = useState<FirestoreReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submittingFor, setSubmittingFor] = useState<number | null>(null);
-  const [resettingFor, setResettingFor] = useState<number | null>(null);
-  // unused state removed
   const [activeTab, setActiveTab] = useState<"pending" | "replied">("pending");
-  const [replies, setReplies] = useState<{ [key: number]: string }>({});
+
+  // Reply Input State
+  const [replies, setReplies] = useState<{ [key: string]: string }>({});
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   const { toasts, addToast } = useToast();
 
-  // ─── データ取得 ───
-  const fetchReviews = useCallback(async (tab: "pending" | "replied") => {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login?redirect=/dashboard");
+    }
+  }, [user, authLoading, router]);
+
+  // ─── データ取得 (Server Actions) ───
+  const fetchData = useCallback(async () => {
+    if (!user) return;
     try {
       setLoading(true);
       setError(null);
 
-      let query;
-      if (tab === "pending") {
-        // 未返信: status が 'replied' でない全レコード（NULL含む）
-        query = supabase
-          .from("reviews")
-          .select("*")
-          .or("status.is.null,status.neq.replied");
-      } else {
-        // 返信済み: status が 'replied' のレコードを最新順で最大20件
-        query = supabase
-          .from("reviews")
-          .select("*")
-          .eq("status", "replied")
-          .limit(20);
+      const token = await getToken();
+      if (!token) throw new Error("認証トークンが取得できませんでした");
+
+      // 並行取得: Stats + Reviews
+      // Phase 2: エラーが出ても画面を落とさない (Empty Stateを表示)
+      try {
+        const [statsData, reviewsData] = await Promise.all([
+          getDashboardStats(token),
+          getReviews(token, activeTab === "pending" ? "pending" : "replied", 20)
+        ]);
+        setStats(statsData);
+        setReviews(reviewsData.reviews);
+      } catch (innerError) {
+        console.error("Data Fetch Error:", innerError);
+        // データがない、または権限エラーの場合でも、空の状態として扱う
+        setStats({
+          totalReviews: 0,
+          unrepliedCount: 0,
+          repliedCount: 0,
+          averageRating: 0,
+          lowRatingCount: 0,
+          updatedAt: new Date()
+        });
+        setReviews([]);
+        if (innerError instanceof Error) {
+          // 開発中は詳細を出すが、本番では穏便に
+          if (process.env.NODE_ENV === "development") setError(innerError.message);
+        }
       }
 
-      const { data, error: supabaseError } = await query.order("created_at", { ascending: false });
-
-      if (supabaseError) throw supabaseError;
-      setReviews((data as Review[]) || []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "データの読み込みに失敗しました";
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, getToken, activeTab]);
 
   useEffect(() => {
-    fetchReviews(activeTab);
-  }, [activeTab, fetchReviews]);
+    fetchData();
+  }, [fetchData]);
 
-  /* Refactored to ReviewReplyButton component
-  const handleGenerateReply = async (review: Review) => {
-      // ... logic moved to component ...
-  };
-  */
-
-  // ─── 返信保存: reply_content に保存 + status を 'replied' に更新 ───
-  const handleSubmitReply = async (reviewId: number) => {
-    const replyContent = replies[reviewId];
-    if (!replyContent) return;
-    if (submittingFor !== null) return; // 二重送信防止
-
-    if (replyContent.length > 300) {
-      addToast("返信内容が300文字を超えています。短くしてください。", "warning");
-      return;
-    }
+  // ─── 保存機能 (Server API) ───
+  const handleSaveReply = async (reviewId: string, content: string) => {
+    if (!content.trim()) return;
+    setSubmittingId(reviewId);
 
     try {
-      setSubmittingFor(reviewId);
+      const token = await getToken();
+      if (!token) {
+        addToast("ユーザー認証エラー: 再ログインしてください", "error");
+        return;
+      }
+
+      // Phase 3で実装する Transaction API をコール
       const response = await fetch("/api/reviews/submit-reply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewId, replyContent }),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.error || "返信の保存に失敗しました");
-      }
-
-      // UIからカードを消して返信データもクリア
-      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
-      setReplies((prev) => {
-        const next = { ...prev };
-        delete next[reviewId];
-        return next;
-      });
-
-      addToast("返信完了しました ✅ 返信済みタブで確認できます");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "保存に失敗しました";
-      addToast(message, "error");
-    } finally {
-      setSubmittingFor(null);
-    }
-  };
-
-  // ─── 未返信に戻す: status を 'unreplied' に、reply_content を null に ───
-  const handleResetStatus = async (reviewId: number) => {
-    if (resettingFor !== null) return;
-    try {
-      setResettingFor(reviewId);
-      const response = await fetch("/api/reviews/reset-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewId }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ reviewId, replyContent: content }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "ステータスの復元に失敗しました");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "保存に失敗しました");
       }
 
-      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
-      addToast("未返信に戻しました");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "復元に失敗しました";
-      addToast(message, "error");
+      addToast("返信を保存しました！");
+      // リロードして最新化（またはOptimistic Update）
+      await fetchData();
+
+    } catch (err: any) {
+      console.error(err);
+      addToast(err.message || "保存できませんでした", "error");
     } finally {
-      setResettingFor(null);
+      setSubmittingId(null);
     }
   };
 
-  // ─── コピー機能（日本語トースト通知付き） ───
+
+  // ─── Utility ───
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -161,26 +138,19 @@ export default function DashboardPage() {
     }
   };
 
-  const getReviewText = (review: Review) => {
-    return review.review_text || review.content || review.comment || review.text || review.body || "（口コミ内容がありません）";
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/10 tracking-tight" style={{ overflowWrap: "break-word" }}>
       <ToastContainer toasts={toasts} />
       <div className="flex h-screen max-h-screen">
-        {/* サイドバー */}
         <AppSidebar activePage="dashboard" />
 
-        {/* メインコンテンツ */}
         <main className="flex-1 overflow-y-auto bg-muted/20">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-            {/* ヘッダー + タブUI */}
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <h1 className="text-3xl font-bold">ダッシュボード</h1>
                 <p className="text-sm text-muted-foreground">
-                  AIによる返信作成と履歴管理
+                  店舗: {stats ? "データ連携済み (Firebase)" : "読み込み中..."}
                 </p>
               </div>
               <div className="flex p-1 bg-muted rounded-xl w-fit">
@@ -205,8 +175,26 @@ export default function DashboardPage() {
               </div>
             </header>
 
-            {/* ローディング / エラー / 空状態 */}
-            {loading && reviews.length === 0 ? (
+            {/* KPI Dashboard (Stats from Firestore) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-card p-5 rounded-xl shadow-sm border">
+                <div className="text-muted-foreground text-sm font-bold mb-1">総口コミ数</div>
+                <div className="text-3xl font-bold">{stats?.totalReviews ?? "-"} <span className="text-sm font-normal">件</span></div>
+                <div className="text-xs text-muted-foreground mt-2">連携中</div>
+              </div>
+              <div className="bg-card p-5 rounded-xl shadow-sm border">
+                <div className="text-muted-foreground text-sm font-bold mb-1">平均スコア</div>
+                <div className="text-3xl font-bold">{stats?.averageRating?.toFixed(1) ?? "-"} <span className="text-lg text-yellow-500">★</span></div>
+                <div className="text-xs text-muted-foreground mt-2">星1-2: {stats?.lowRatingCount ?? 0}件</div>
+              </div>
+              <div className="bg-card p-5 rounded-xl shadow-sm border">
+                <div className="text-muted-foreground text-sm font-bold mb-1">未返信</div>
+                <div className="text-3xl font-bold text-destructive">{stats?.unrepliedCount ?? "-"} <span className="text-sm font-normal">件</span></div>
+                <div className="text-xs text-muted-foreground mt-2">対応が必要です</div>
+              </div>
+            </div>
+
+            {(loading || authLoading) && reviews.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-32 text-muted-foreground gap-3">
                 <Loader2 className="size-10 animate-spin text-primary/40" />
                 <p className="text-sm font-medium">データを読み込み中...</p>
@@ -225,11 +213,10 @@ export default function DashboardPage() {
                   {activeTab === "pending" ? "未返信の口コミはありません" : "返信済みの口コミはありません"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {activeTab === "pending" ? "すべての対応が完了しました 🎉" : "まだ返信を保存していません"}
+                  (Firestoreにデータがない場合もここに表示されます)
                 </p>
               </div>
             ) : (
-              /* ─── レビューカード一覧 ─── */
               <div className="grid grid-cols-1 gap-6">
                 {reviews.map((review) => (
                   <Card key={review.id} className={`shadow-sm hover:shadow-md transition-shadow overflow-hidden ${activeTab === "replied"
@@ -247,31 +234,24 @@ export default function DashboardPage() {
                             </Badge>
                           </CardTitle>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{new Date(review.created_at).toLocaleDateString("ja-JP")}</span>
+                            <span>{new Date(review.publishedAt as Date).toLocaleDateString("ja-JP")}</span>
                             <span className="flex text-amber-400 font-bold">
                               {"★".repeat(review.rating)}
                             </span>
-                            {/* 返信済みタブ: 返信日時を表示 */}
-                            {activeTab === "replied" && review.updated_at && (
+                            {activeTab === "replied" && review.updatedAt && (
                               <span className="text-emerald-600 font-medium">
-                                返信日: {new Date(review.updated_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                更新日: {new Date(review.updatedAt as Date).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}
                               </span>
                             )}
                           </div>
                         </div>
-                        {/* ステータスバッジ: 返信済み=グリーン、未返信=赤(destructive) */}
                         {activeTab === "replied" ? (
-                          <Badge
-                            className="text-[11px] font-bold px-2.5 py-1 shrink-0 ml-2 bg-emerald-100 text-emerald-700 border border-emerald-300"
-                          >
+                          <Badge className="text-[11px] font-bold px-2.5 py-1 shrink-0 ml-2 bg-emerald-100 text-emerald-700 border border-emerald-300">
                             <CheckCircle className="size-3.5 mr-1" />
                             返信済み
                           </Badge>
                         ) : (
-                          <Badge
-                            variant="destructive"
-                            className="text-[10px] font-bold px-2 py-0.5 shrink-0 ml-2"
-                          >
+                          <Badge variant="destructive" className="text-[10px] font-bold px-2 py-0.5 shrink-0 ml-2">
                             未返信
                           </Badge>
                         )}
@@ -279,12 +259,10 @@ export default function DashboardPage() {
                     </CardHeader>
 
                     <CardContent className="py-5 space-y-5">
-                      {/* 口コミ本文 */}
                       <p className="text-sm leading-relaxed text-foreground/90" style={{ overflowWrap: "break-word", whiteSpace: "pre-wrap" }}>
-                        {getReviewText(review)}
+                        {review.content}
                       </p>
 
-                      {/* ── 未返信タブ: AI生成返信の編集エリア ── */}
                       {activeTab === "pending" && replies[review.id] && (
                         <div className="p-5 rounded-2xl bg-primary/5 border border-primary/10 space-y-4 animate-in fade-in zoom-in-95 duration-300">
                           <div className="flex items-center justify-between">
@@ -292,103 +270,46 @@ export default function DashboardPage() {
                               <Sparkles className="size-3.5" />
                               <span>AI 生成の返信案</span>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2 text-xs"
-                              onClick={() => copyToClipboard(replies[review.id])}
-                            >
-                              <Copy className="size-3 mr-1.5" />
+                          </div>
+                          <textarea
+                            value={replies[review.id]}
+                            onChange={(e) => setReplies(prev => ({ ...prev, [review.id]: e.target.value }))}
+                            className="w-full min-h-[120px] p-3 text-sm leading-relaxed font-medium text-foreground bg-background border border-primary/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button size="sm" onClick={() => copyToClipboard(replies[review.id])}>
                               コピー
                             </Button>
-                          </div>
-                          <div className="space-y-2">
-                            <textarea
-                              value={replies[review.id]}
-                              onChange={(e) => setReplies(prev => ({ ...prev, [review.id]: e.target.value }))}
-                              className="w-full min-h-[120px] p-3 text-sm leading-relaxed font-medium text-foreground bg-background border border-primary/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
-                              style={{ overflowWrap: "break-word" }}
-                              placeholder="返信内容を編集できます..."
-                            />
-                            <div className={`text-xs text-right font-medium ${replies[review.id].length > 300
-                              ? "text-destructive font-bold"
-                              : replies[review.id].length > 280
-                                ? "text-amber-600"
-                                : "text-muted-foreground"
-                              }`}>
-                              {replies[review.id].length} / 300文字
-                              {replies[review.id].length > 300 && " (超過)"}
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-lg h-9"
-                              onClick={() => setReplies(prev => {
-                                const next = { ...prev };
-                                delete next[review.id];
-                                return next;
-                              })}
-                            >
+                            <Button size="sm" variant="outline" onClick={() => setReplies(prev => {
+                              const next = { ...prev };
+                              delete next[review.id];
+                              return next;
+                            })}>
                               破棄
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="rounded-lg h-9 px-4"
-                              onClick={() => handleSubmitReply(review.id)}
-                              disabled={submittingFor === review.id || replies[review.id].length > 300}
-                            >
-                              {submittingFor === review.id ? (
-                                <Loader2 className="size-4 animate-spin mr-2" />
-                              ) : (
-                                <CheckCircle className="size-4 mr-2" />
-                              )}
-                              {submittingFor === review.id ? "保存中..." : "この内容で返信"}
                             </Button>
                           </div>
                         </div>
                       )}
 
-                      {/* ── 返信済みタブ: 保存済み返信の表示 + コピー + 未返信に戻す ── */}
-                      {activeTab === "replied" && review.reply_content && (
+                      {/* 返信済み内容の表示はAPIでreviewに含めるか、別途取得か。今回はsummaryを使用 */}
+                      {activeTab === "replied" && review.replySummary && (
                         <div className="p-5 rounded-2xl bg-muted/50 border space-y-3">
-                          <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>保存済みの返信</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-[10px]"
-                              onClick={() => copyToClipboard(review.reply_content!)}
-                            >
-                              <Copy className="size-3 mr-1.5" />
-                              コピー
-                            </Button>
-                          </div>
                           <p className="text-sm text-foreground/70 italic" style={{ overflowWrap: "break-word", whiteSpace: "pre-wrap" }}>
-                            {review.reply_content}
+                            {review.replySummary}
                           </p>
-                          <div className="flex justify-end pt-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs text-muted-foreground hover:text-destructive h-8"
-                              onClick={() => handleResetStatus(review.id)}
-                              disabled={resettingFor === review.id}
-                            >
-                              <RotateCcw className={`size-3.5 mr-1.5 ${resettingFor === review.id ? "animate-spin" : ""}`} />
-                              未返信に戻す
+                          <div className="flex justify-end">
+                            <Button variant="ghost" size="sm" onClick={() => copyToClipboard(review.replySummary!)}>
+                              <Copy className="size-3 mr-1.5" /> コピー
                             </Button>
                           </div>
                         </div>
                       )}
                     </CardContent>
 
-                    {/* ── 未返信タブ: AI生成ボタン (Component) ── */}
                     {activeTab === "pending" && !replies[review.id] && (
                       <div className="px-6 py-4 bg-muted/10 border-t flex justify-end">
                         <ReviewReplyButton
-                          reviewText={getReviewText(review)}
+                          reviewText={review.content}
                           customerName={review.author}
                           rating={review.rating}
                           onReplyGenerated={(reply) => setReplies(prev => ({ ...prev, [review.id]: reply }))}
@@ -396,6 +317,21 @@ export default function DashboardPage() {
                         />
                       </div>
                     )}
+
+                    {/* 保存ボタン (AI生成後) */}
+                    {activeTab === "pending" && replies[review.id] && (
+                      <div className="px-6 py-4 bg-white border-t flex justify-end">
+                        <Button
+                          onClick={() => handleSaveReply(review.id, replies[review.id])}
+                          disabled={submittingId === review.id}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        >
+                          {submittingId === review.id ? <Loader2 className="animate-spin size-4 mr-2" /> : null}
+                          {submittingId === review.id ? "保存中..." : "返信を保存して完了"}
+                        </Button>
+                      </div>
+                    )}
+
                   </Card>
                 ))}
               </div>

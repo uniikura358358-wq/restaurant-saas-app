@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { auth } from '@/lib/firebase';
 
 // SVG Icons (Dependency-free)
 const SparklesIcon = () => (
@@ -15,6 +16,7 @@ interface ReviewReplyButtonProps {
     customerName?: string;
     rating: number;
     onReplyGenerated: (reply: string) => void;
+    className?: string; // Add className to props
 }
 
 export default function ReviewReplyButton({
@@ -22,6 +24,7 @@ export default function ReviewReplyButton({
     customerName = 'お客様',
     rating,
     onReplyGenerated,
+    className,
 }: ReviewReplyButtonProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,14 +36,24 @@ export default function ReviewReplyButton({
         setError(null);
 
         try {
+            // Firebase ID Token 取得
+            const user = auth.currentUser;
+            if (!user) {
+                throw new Error('ログインが必要です');
+            }
+            const idToken = await user.getIdToken();
+
             const response = await fetch('/api/generate-reply', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
                 body: JSON.stringify({
                     reviewText,
                     customerName,
-                    starRating: rating,    // API expects 'starRating', not 'rating'
-                    config: {              // API expects 'config' object
+                    starRating: rating,
+                    config: {
                         store_name: "マイ店舗",
                         ai_tone: "polite",
                         emoji_level: 2,
@@ -50,7 +63,10 @@ export default function ReviewReplyButton({
                 }),
             });
 
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP Error: ${response.status}`);
+            }
 
             const data = await response.json();
 
@@ -60,16 +76,16 @@ export default function ReviewReplyButton({
                 throw new Error('AIからの応答が空でした。');
             }
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Generation failed:', err);
-            setError('生成に失敗しました。');
+            setError(err.message || '生成に失敗しました。');
         } finally {
             setIsGenerating(false);
         }
     };
 
     return (
-        <div className="flex flex-col items-start gap-2 my-2">
+        <div className={`flex flex-col items-start gap-2 my-2 ${className || ''}`}>
             <button
                 onClick={handleGenerate}
                 disabled={isGenerating || !reviewText}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { usePlanGuard } from "@/hooks/usePlanGuard";
 // createClient import removed
 import { toast } from "sonner";
 import {
@@ -14,6 +16,7 @@ import {
     Settings2,
     MessageSquareShare,
     Lock,
+    RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,8 +119,8 @@ function StoreSettingsContent() {
     const [config, setConfig] = useState<ToneConfigData>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    // モックのプラン状態（デモ用）
-    const [currentPlan] = useState<"Light" | "Standard" | "Pro">("Light");
+    const { hasFeature, loading: planLoading, refreshPlan } = usePlanGuard();
+    const router = useRouter();
 
     /** textareaの参照（タグ挿入用） */
     const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -525,7 +528,7 @@ function StoreSettingsContent() {
                                                 </CardHeader>
                                                 <div className="relative">
                                                     {/* ロックオーバーレイ */}
-                                                    {(["Light"].includes(currentPlan)) && (
+                                                    {!hasFeature('instagram') && (
                                                         <div className="absolute inset-0 z-10 backdrop-blur-[2px] bg-background/50 flex flex-col items-center justify-center text-center p-6 rounded-lg border border-dashed border-muted-foreground/20">
                                                             <div className="p-3 bg-muted rounded-full mb-4">
                                                                 <Lock className="size-6 text-muted-foreground" />
@@ -534,9 +537,23 @@ function StoreSettingsContent() {
                                                             <p className="text-sm text-muted-foreground mb-6 max-w-[300px]">
                                                                 Instagram連携機能を使用するには、プランのアップグレードが必要です。
                                                             </p>
-                                                            <Button className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:shadow-xl transition-all">
-                                                                プランを確認する
-                                                            </Button>
+                                                            <div className="flex flex-col sm:flex-row gap-3">
+                                                                <Button
+                                                                    className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:shadow-xl transition-all"
+                                                                    onClick={() => router.push('/plans')}
+                                                                >
+                                                                    プランを確認する
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    className="gap-2"
+                                                                    onClick={() => refreshPlan()}
+                                                                    disabled={planLoading}
+                                                                >
+                                                                    <RefreshCcw className={`size-4 ${planLoading ? 'animate-spin' : ''}`} />
+                                                                    プラン情報を更新
+                                                                </Button>
+                                                            </div>
                                                         </div>
                                                     )}
 

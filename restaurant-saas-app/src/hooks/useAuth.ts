@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged as onFirebaseAuthStateChange, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export function useAuth() {
@@ -11,13 +11,20 @@ export function useAuth() {
             setLoading(false);
             return;
         }
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
+
+        // 状態変化を監視
+        const unsubscribe = onFirebaseAuthStateChange(auth, (firebaseUser) => {
+            setUser(firebaseUser);
             setLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
-    return { user, loading };
+    const getToken = async () => {
+        if (!auth?.currentUser) return null;
+        return auth.currentUser.getIdToken();
+    };
+
+    return { user, loading, getToken };
 }

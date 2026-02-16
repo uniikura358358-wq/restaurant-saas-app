@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
-    activePage: "dashboard" | "store" | "account";
+    activePage: "dashboard" | "store" | "account" | "settings";
 }
 
 export function AppSidebar({ activePage }: AppSidebarProps) {

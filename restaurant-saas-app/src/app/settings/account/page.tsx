@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase";
+// import { createClient } from "@/lib/supabase";
 import { toast } from "sonner";
 import {
     User,
@@ -21,13 +21,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { useAuth } from "@/hooks/useAuth";
+import type { User as FirebaseUser } from "firebase/auth";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
     DEFAULT_NOTIFICATION_CONFIG,
     type NotificationConfig,
 } from "@/lib/notification-handler";
-import { getSmsUsageSummary, DEFAULT_SMS_LIMIT, type SmsUsageSummary } from "@/lib/sms-quota";
+import { DEFAULT_SMS_LIMIT, type SmsUsageSummary } from "@/lib/sms-quota-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +52,10 @@ export default function AccountSettingsPage() {
 
 function AccountSettingsContent() {
     const searchParams = useSearchParams();
-    const [user, setUser] = useState<SupabaseUser | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [user] = useState<FirebaseUser | null>(null);
+    const { user: authUser, loading: authLoading, getToken } = useAuth();
+    // const [loading, setLoading] = useState(true); // useAuth's loading is enough or we combine
+    const [pageLoading, setPageLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
     // Notification State
@@ -62,6 +65,7 @@ function AccountSettingsContent() {
     const [showOtpInput, setShowOtpInput] = useState(false);
     const [otpCode, setOtpCode] = useState("");
     const [verifyingOtp, setVerifyingOtp] = useState(false);
+    const [planName, setPlanName] = useState("free"); // Add plan state
 
     // SMS Usage State
     const [smsUsage, setSmsUsage] = useState<SmsUsageSummary>({
@@ -71,43 +75,17 @@ function AccountSettingsContent() {
         usageMonth: "",
     });
 
-    // ユーザー情報を取得
-    const fetchUser = useCallback(async () => {
-        const supabase = createClient();
-        const { data, error } = await supabase.auth.getUser();
-        if (!error && data.user) {
-            setUser(data.user);
-        }
-    }, []);
-
-    // SMS利用状況を取得
-    const fetchSmsUsage = useCallback(async () => {
-        try {
-            const supabase = createClient();
-            const { data: authData, error: authError } = await supabase.auth.getUser();
-            if (authError || !authData.user) return;
-
-            const { data: storeSettings, error: settingsError } = await supabase
-                .from("store_settings")
-                .select("id, sms_limit_override")
-                .eq("user_id", authData.user.id)
-                .limit(1)
-                .maybeSingle();
-
-            if (settingsError || !storeSettings?.id) return;
-
-            const limitOverride = storeSettings.sms_limit_override ?? DEFAULT_SMS_LIMIT;
-            const summary = await getSmsUsageSummary(supabase, storeSettings.id, limitOverride);
-            setSmsUsage(summary);
-        } catch {
-            // Error handled by fallback
-        }
-    }, []);
-
     // 設定を取得
     const fetchConfig = useCallback(async () => {
+        if (!authUser) return;
         try {
-            const response = await fetch("/api/settings/get", { cache: "no-store" });
+            const token = await getToken();
+            const response = await fetch("/api/settings/get", {
+                cache: "no-store",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
             if (!response.ok) throw new Error("設定の取得に失敗しました");
             const data = await response.json();
 
@@ -118,18 +96,29 @@ function AccountSettingsContent() {
             }
             if (data.sms_usage) setSmsUsage(data.sms_usage); // APIからも取得
 
+            // Plan name might need to be fetched or inferred. For now default "free" or from profile if API returned it.
+            // The new API doesn't explicitly return plan_name in the root, but we can add it or mock it.
+            // Let's assume free for now or if we added it to API.
+            // setPlanName(data.plan_name || "free"); 
+
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "設定の取得に失敗しました");
         } finally {
-            setLoading(false);
+            setPageLoading(false);
         }
-    }, []);
+    }, [authUser, getToken]);
 
     useEffect(() => {
-        fetchUser();
-        fetchConfig();
-        fetchSmsUsage();
-    }, [fetchUser, fetchConfig, fetchSmsUsage]);
+        if (!authLoading) {
+            if (authUser) {
+                fetchConfig();
+            } else {
+                // Redirect handled by middleware or parent? 
+                // Or just stop loading.
+                setPageLoading(false);
+            }
+        }
+    }, [authLoading, authUser, fetchConfig]);
 
     // URLパラメータの確認完了トースト
     useEffect(() => {
@@ -153,8 +142,8 @@ function AccountSettingsContent() {
 
     // ログアウト処理
     const handleLogout = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
+        const { auth } = await import("@/lib/firebase");
+        await auth.signOut();
         window.location.href = "/login";
     };
 
@@ -162,9 +151,13 @@ function AccountSettingsContent() {
     const handleSave = async () => {
         try {
             setSaving(true);
+            const token = await getToken();
             const response = await fetch("/api/settings/save", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     notification_config: notificationConfig
                 }),
@@ -231,9 +224,13 @@ function AccountSettingsContent() {
 
         try {
             setSendingVerification(channel);
+            const token = await getToken();
             const response = await fetch("/api/notifications/verify", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({ channel, contact_value: contactValue }),
             });
             if (!response.ok) throw new Error("送信に失敗しました");
@@ -253,9 +250,13 @@ function AccountSettingsContent() {
     const verifyOtp = async () => {
         try {
             setVerifyingOtp(true);
+            const token = await getToken();
             const response = await fetch("/api/notifications/verify/confirm", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({ otp: otpCode }),
             });
             if (!response.ok) throw new Error("認証に失敗しました");
@@ -279,7 +280,7 @@ function AccountSettingsContent() {
                 <h1 className="text-2xl font-bold">アカウント設定</h1>
             </header>
 
-            {loading ? (
+            {pageLoading ? (
                 <div className="flex items-center justify-center py-24">
                     <Loader2 className="size-8 animate-spin text-primary/50" />
                 </div>
@@ -294,15 +295,15 @@ function AccountSettingsContent() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {user && (
+                            {authUser && (
                                 <>
                                     <div className="flex items-center justify-between py-2 border-b">
                                         <span className="text-sm text-muted-foreground">メールアドレス</span>
-                                        <span className="font-medium">{user.email}</span>
+                                        <span className="font-medium">{authUser.email}</span>
                                     </div>
                                     <div className="flex items-center justify-between py-2 border-b">
                                         <span className="text-sm text-muted-foreground">ユーザーID</span>
-                                        <span className="font-mono text-xs text-muted-foreground">{user.id}</span>
+                                        <span className="font-mono text-xs text-muted-foreground">{authUser.uid}</span>
                                     </div>
                                 </>
                             )}

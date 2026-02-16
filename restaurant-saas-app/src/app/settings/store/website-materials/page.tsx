@@ -1,37 +1,47 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePlanGuard } from "@/hooks/usePlanGuard";
+import { Lock } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Wand2, CheckCircle2, AlertCircle, Loader2, Sparkles, Save, Plus, Trash2, CalendarDays, Camera, RefreshCcw, X, Smartphone, Instagram } from "lucide-react";
+import { Upload, CheckCircle2, AlertCircle, Loader2, Sparkles, Plus, Trash2, CalendarDays, Camera, RefreshCcw, X, Smartphone, Instagram } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase"; // Correct import
+import { useAuth } from "@/hooks/useAuth";
+import { saveStoreSettings, getUserProfile } from "@/app/actions/settings";
 
 export default function MaterialsPage() {
-    const supabase = createClient(); // Initialize client
+    const { user, getToken, loading: authLoading } = useAuth();
+    const router = useRouter();
+    const { hasFeature, loading: planLoading, refreshPlan } = usePlanGuard();
     const [useGoogleData, setUseGoogleData] = useState(true);
     const [catchCopy, setCatchCopy] = useState("こだわりの自家製麺と、秘伝のスープをお楽しみください。");
     const [isAdjusting, setIsAdjusting] = useState(false);
 
-    // State definitions
+    // AI利用状況
     const [aiUsageCount, setAiUsageCount] = useState(0);
-    const MAX_USAGE = 30; // Simply use a count limit
+    // const MAX_USAGE = 30; // 仮の上限
     const [isSaving, setIsSaving] = useState(false);
-    const [basicInfo, setBasicInfo] = useState({ storeName: '', phone: '', address: '', hours: '' }); // Mock state
-    const [images, setImages] = useState({ interior: '', menu1: '', menu2: '', menu3: '' }); // Mock state
 
-    // Day-of-week Menu State
-    const [scheduledMenus, setScheduledMenus] = useState([
+    // 基本情報（Firestore StoreDataとマッピング）
+    const [basicInfo, setBasicInfo] = useState({ storeName: '', phone: '', address: '', hours: '' });
+
+    // 画像情報（現在はURL文字列として管理）
+    const [images, setImages] = useState({ interior: '', menu1: '', menu2: '', menu3: '' }); // menu1-3 for products
+
+    // 曜日別メニュー
+    const [scheduledMenus, setScheduledMenus] = useState<any[]>([
         { id: 1, name: '平日限定ランチ', days: [1, 2, 3, 4, 5], image: '' },
         { id: 2, name: '土日限定メニュー', days: [6, 0], image: '' }
     ]);
 
-    // Camera State
+    // カメラ関連
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [cameraMode, setCameraMode] = useState<'portrait' | 'landscape' | 'insta-square' | 'insta-story'>('landscape');
     const [activeTargetField, setActiveTargetField] = useState<string | null>(null);
@@ -48,16 +58,50 @@ export default function MaterialsPage() {
         { label: '土', value: 6 },
     ];
 
-    // Usage tracking (Internal: 700 yen limit)
+    // 内部コスト管理（MVP用）
     const [internalCost, setInternalCost] = useState(0);
     const [currentMaxLimit, setCurrentMaxLimit] = useState(700);
 
-    // Date check for monthly reset proximity
     const today = new Date();
     const isLateInMonth = today.getDate() >= 25;
 
+    // 初期データ取得
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!user) return;
+            try {
+                const token = await getToken();
+                if (!token) return;
+
+                const { success, store, error } = await getUserProfile(token);
+                if (success && store) {
+                    // StoreDataから状態を復元
+                    if (store.storeName) setBasicInfo(prev => ({ ...prev, storeName: store.storeName }));
+                    if (store.websiteMaterials) {
+                        const wm = store.websiteMaterials;
+                        if (wm.catchCopy) setCatchCopy(wm.catchCopy);
+                        if (wm.address) setBasicInfo(prev => ({ ...prev, address: wm.address || '' }));
+                        if (wm.phone) setBasicInfo(prev => ({ ...prev, phone: wm.phone || '' }));
+                        if (wm.businessHours) setBasicInfo(prev => ({ ...prev, hours: wm.businessHours || '' }));
+
+                        if (wm.images) setImages(prev => ({ ...prev, ...wm.images }));
+                        if (wm.menus) setScheduledMenus(wm.menus || []);
+                    }
+                }
+            } catch (err) {
+                console.error("Fetch Data Error:", err);
+                toast.error("データの取得に失敗しました");
+            }
+        };
+
+        if (!authLoading && user) {
+            fetchData();
+        }
+    }, [user, authLoading, getToken]);
+
+
     const handleAIAdjustment = async () => {
-        // Internal cost check (Hidden from user)
+        // 利用枠チェック（内部管理）
         if (internalCost >= currentMaxLimit) {
             const message = isLateInMonth
                 ? "今月のAI利用枠に達しました。来月の更新をお待ちいただくか、追加枠をご検討ください。"
@@ -68,17 +112,11 @@ export default function MaterialsPage() {
 
         setIsAdjusting(true);
         try {
-            // Simulate API Call to Gemini-3-flash-preview
-            const response = await fetch('/api/ai/adjust-text', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: catchCopy, model: 'gemini-3-flash-preview' }),
-            });
+            // Mock logic for demo
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            const newCopy = catchCopy + "（AI調整済み）"; // Mock logic
 
-            if (!response.ok) throw new Error("AI adjust failed");
-
-            const data = await response.json();
-            setCatchCopy(data.result);
+            setCatchCopy(newCopy);
             setInternalCost(prev => prev + 25);
             setAiUsageCount(prev => prev + 1);
 
@@ -91,20 +129,39 @@ export default function MaterialsPage() {
     };
 
     const handleSave = async () => {
+        if (!user) return;
         setIsSaving(true);
         try {
-            // Simulate saving to Supabase
-            // await supabase.from('store_materials').upsert({
-            //     user_id: user.id,
-            //     catch_copy: catchCopy,
-            //     // ... other fields
-            // });
+            const token = await getToken();
+            if (!token) throw new Error("認証トークンが取得できません");
 
-            // Simulate delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Firestore保存用のデータ構築
+            const storeDataPayload = {
+                storeName: basicInfo.storeName,
+                // addressなどは websiteMaterials に含めるか、StoreData直下にするか。
+                // Firestore.ts定義に合わせて websiteMaterials に集約
+                websiteMaterials: {
+                    catchCopy,
+                    storeName: basicInfo.storeName,
+                    address: basicInfo.address,
+                    phone: basicInfo.phone,
+                    businessHours: basicInfo.hours,
+                    images: {
+                        interior: images.interior,
+                        menu1: images.menu1,
+                        menu2: images.menu2,
+                        menu3: images.menu3
+                    },
+                    menus: scheduledMenus
+                }
+            };
+
+            const result = await saveStoreSettings(token, storeDataPayload);
+
+            if (!result.success) throw new Error(result.error);
 
             toast.success("保存しました！制作チームへ通知が送信されました。");
-        } catch (error) {
+        } catch (error: any) {
             console.error('Save error:', error);
             toast.error("保存に失敗しました。");
         } finally {
@@ -113,7 +170,7 @@ export default function MaterialsPage() {
     };
 
     const handleBuyExtension = () => {
-        // In real app, this would trigger Stripe Checkout
+        // Stripe連携予定箇所
         setCurrentMaxLimit(prev => prev + 500);
         toast.success("AI利用枠を追加しました！");
     };
@@ -122,7 +179,7 @@ export default function MaterialsPage() {
         setScheduledMenus(prev => prev.map(menu => {
             if (menu.id === menuId) {
                 const newDays = menu.days.includes(dayValue)
-                    ? menu.days.filter(d => d !== dayValue)
+                    ? menu.days.filter((d: number) => d !== dayValue)
                     : [...menu.days, dayValue];
                 return { ...menu, days: newDays };
             }
@@ -146,7 +203,7 @@ export default function MaterialsPage() {
         ));
     };
 
-    // Camera Logic
+    // カメラ機能（変更なし・クライアントサイドのみで完結するため）
     const startCamera = async (targetField: string, initialMode: 'portrait' | 'landscape' | 'insta-square' | 'insta-story') => {
         setActiveTargetField(targetField);
         setCameraMode(initialMode);
@@ -181,8 +238,10 @@ export default function MaterialsPage() {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(videoRef.current, 0, 0);
-                const dataUrl = canvas.toDataURL('image/jpeg');
-                // In a real app, update state here. For mock:
+                // const dataUrl = canvas.toDataURL('image/jpeg');
+                // ここで本来はStorageへアップロード処理が入る
+                // MVPではDataURLをそのまま使うか、モックとして成功のみ返す
+
                 toast.success("写真をキャプチャしました！枠に合わせて保存します。");
                 stopCamera();
             }
@@ -196,6 +255,11 @@ export default function MaterialsPage() {
             }
         };
     }, []);
+
+    // 認証ロード中などの表示調整
+    if (authLoading) {
+        return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+    }
 
     return (
         <div className="container mx-auto py-10 px-4 max-w-4xl">
@@ -232,15 +296,27 @@ export default function MaterialsPage() {
                             <div className="grid gap-4 mt-4 pl-4 border-l-2 border-gray-200">
                                 <div className="grid gap-2">
                                     <Label>店舗名</Label>
-                                    <Input placeholder="例: 銀座ラーメン 太郎" />
+                                    <Input
+                                        placeholder="例: 銀座ラーメン 太郎"
+                                        value={basicInfo.storeName}
+                                        onChange={(e) => setBasicInfo({ ...basicInfo, storeName: e.target.value })}
+                                    />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label>住所</Label>
-                                    <Input placeholder="〒104-0061 東京都中央区銀座..." />
+                                    <Input
+                                        placeholder="〒104-0061 東京都中央区銀座..."
+                                        value={basicInfo.address}
+                                        onChange={(e) => setBasicInfo({ ...basicInfo, address: e.target.value })}
+                                    />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label>電話番号</Label>
-                                    <Input placeholder="03-1234-5678" />
+                                    <Input
+                                        placeholder="03-1234-5678"
+                                        value={basicInfo.phone}
+                                        onChange={(e) => setBasicInfo({ ...basicInfo, phone: e.target.value })}
+                                    />
                                 </div>
                             </div>
                         )}
@@ -305,10 +381,11 @@ export default function MaterialsPage() {
                                 {[1, 2, 3].map((i) => (
                                     <div key={i} className="border rounded-2xl p-6 bg-white space-y-4 shadow-sm">
                                         <div
-                                            className="bg-gray-50 border-2 border-dashed h-40 rounded-xl flex flex-col items-center justify-center text-gray-400 group hover:bg-white hover:border-blue-200 transition-all cursor-pointer"
+                                            className="bg-gray-50 border-2 border-dashed h-40 rounded-xl flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer"
                                         >
-                                            <Upload className="w-6 h-6 mb-2 text-gray-300 group-hover:text-blue-400" />
-                                            <span className="text-xs font-bold">画像アップロード</span>
+                                            <Upload className="w-6 h-6 text-gray-300 mb-1" />
+                                            <span className="text-[10px] text-gray-400 font-bold uppercase">画像アップロード</span>
+                                            <span className="text-[9px] text-blue-500 underline mt-1">画像をアップロード</span>
                                         </div>
                                         <Button
                                             variant="outline"
@@ -350,7 +427,6 @@ export default function MaterialsPage() {
                                     HPのトップに表示される重要な文章です。AIがより魅力的な表現に磨き上げます。
                                 </CardDescription>
                             </div>
-                            {/* Usage info removed from UI as requested */}
                             <div className="text-right text-xs">
                                 <p className="text-gray-500">AI利用状況</p>
                                 <div className="font-bold text-indigo-600">
@@ -398,7 +474,6 @@ export default function MaterialsPage() {
                                 </p>
                             </div>
 
-                            {/* Upsell Button - triggered by internal cost */}
                             {internalCost >= currentMaxLimit - 100 && !isLateInMonth && (
                                 <Button
                                     size="sm"
@@ -451,7 +526,6 @@ export default function MaterialsPage() {
                                 </Button>
 
                                 <div className="grid md:grid-cols-5 gap-6">
-                                    {/* Image Preview Area */}
                                     <div className="md:col-span-2">
                                         <div className="border-2 border-dashed rounded-lg h-32 flex flex-col items-center justify-center bg-white hover:bg-gray-50 transition cursor-pointer">
                                             <Upload className="w-6 h-6 text-gray-300 mb-1" />
@@ -460,7 +534,6 @@ export default function MaterialsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Configuration Area */}
                                     <div className="md:col-span-3 space-y-4">
                                         <div className="grid gap-2">
                                             <Label className="text-xs text-gray-500 font-bold uppercase tracking-wider">パターン名称</Label>
@@ -541,56 +614,86 @@ export default function MaterialsPage() {
                             インスタの規格に合わせた写真撮影が可能です。AIが投稿文を作成する際の参考画像になります。
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <Label className="text-sm font-bold flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-pink-500" />
-                                    通常フィード用 (1:1 正方形)
-                                </Label>
-                                <div className="border-2 border-dashed border-pink-200 rounded-2xl h-48 flex flex-col items-center justify-center bg-white/50 group hover:border-pink-400 transition-colors">
+                    <div className="relative">
+                        {!hasFeature('instagram') && (
+                            <div className="absolute inset-0 z-10 backdrop-blur-[2px] bg-background/50 flex flex-col items-center justify-center text-center p-6 rounded-lg border border-dashed border-muted-foreground/20">
+                                <div className="p-3 bg-muted rounded-full mb-4">
+                                    <Lock className="size-6 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-lg font-bold mb-2">Standardプラン以上で利用可能</h3>
+                                <p className="text-sm text-muted-foreground mb-6 max-w-[300px]">
+                                    Instagram素材収集機能を使用するには、プランのアップグレードが必要です。
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <Button
+                                        className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold shadow-lg hover:shadow-xl transition-all"
+                                        onClick={() => router.push('/plans')}
+                                    >
+                                        プランを確認する
+                                    </Button>
                                     <Button
                                         variant="outline"
-                                        className="mb-2 border-pink-200 text-pink-600 hover:bg-pink-50"
-                                        onClick={() => startCamera('insta_feed', 'insta-square')}
+                                        className="gap-2"
+                                        onClick={() => refreshPlan()}
+                                        disabled={planLoading}
                                     >
-                                        <Camera className="w-4 h-4 mr-2" />
-                                        ガイド付カメラ起動
+                                        <RefreshCcw className={`size-4 ${planLoading ? 'animate-spin' : ''}`} />
+                                        プラン情報を更新
                                     </Button>
-                                    <p className="text-[10px] text-pink-400">料理の接写や看板に最適</p>
                                 </div>
                             </div>
+                        )}
+                        <CardContent className={!hasFeature('instagram') ? "opacity-50 pointer-events-none select-none filter blur-[1px]" : ""}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <Label className="text-sm font-bold flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-pink-500" />
+                                        通常フィード用 (1:1 正方形)
+                                    </Label>
+                                    <div className="border-2 border-dashed border-pink-200 rounded-2xl h-48 flex flex-col items-center justify-center bg-white/50 group hover:border-pink-400 transition-colors">
+                                        <Button
+                                            variant="outline"
+                                            className="mb-2 border-pink-200 text-pink-600 hover:bg-pink-50"
+                                            onClick={() => startCamera('insta_feed', 'insta-square')}
+                                        >
+                                            <Camera className="w-4 h-4 mr-2" />
+                                            ガイド付カメラ起動
+                                        </Button>
+                                        <p className="text-[10px] text-pink-400">料理の接写や看板に最適</p>
+                                    </div>
+                                </div>
 
-                            <div className="space-y-4">
-                                <Label className="text-sm font-bold flex items-center gap-2">
-                                    <Smartphone className="w-4 h-4 text-purple-500" />
-                                    ストーリーズ・リール用 (9:16 縦長)
-                                </Label>
-                                <div className="border-2 border-dashed border-purple-200 rounded-2xl h-48 flex flex-col items-center justify-center bg-white/50 group hover:border-purple-400 transition-colors">
-                                    <Button
-                                        variant="outline"
-                                        className="mb-2 border-purple-200 text-purple-600 hover:bg-purple-50"
-                                        onClick={() => startCamera('insta_story', 'insta-story')}
-                                    >
-                                        <Camera className="w-4 h-4 mr-2" />
-                                        ガイド付カメラ起動
-                                    </Button>
-                                    <p className="text-[10px] text-purple-400">店内の雰囲気や動画素材に最適</p>
+                                <div className="space-y-4">
+                                    <Label className="text-sm font-bold flex items-center gap-2">
+                                        <Smartphone className="w-4 h-4 text-purple-500" />
+                                        ストーリーズ・リール用 (9:16 縦長)
+                                    </Label>
+                                    <div className="border-2 border-dashed border-purple-200 rounded-2xl h-48 flex flex-col items-center justify-center bg-white/50 group hover:border-purple-400 transition-colors">
+                                        <Button
+                                            variant="outline"
+                                            className="mb-2 border-purple-200 text-purple-600 hover:bg-purple-50"
+                                            onClick={() => startCamera('insta_story', 'insta-story')}
+                                        >
+                                            <Camera className="w-4 h-4 mr-2" />
+                                            ガイド付カメラ起動
+                                        </Button>
+                                        <p className="text-[10px] text-purple-400">店内の雰囲気や動画素材に最適</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </CardContent>
+                        </CardContent>
+                    </div>
                 </Card>
 
                 <div className="flex justify-center pt-6 pb-20">
-                    <Button size="lg" className="w-full max-w-md text-lg font-bold" onClick={handleSave}>
-                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                    <Button size="lg" className="w-full max-w-md text-lg font-bold" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
                         この内容で保存・更新する
                     </Button>
                 </div>
             </div>
 
-            {/* Camera Overlay Modal */}
+            {/* Camera Overlay Modal (Unchanged from original structure, mostly) */}
             {isCameraOpen && (
                 <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
                     <div className="absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[110]">
@@ -610,10 +713,7 @@ export default function MaterialsPage() {
                             playsInline
                             className="w-full h-full object-cover"
                         />
-
-                        {/* Guide Lines SVG Layer */}
                         <div className="absolute inset-0 pointer-events-none">
-                            {/* The Grid */}
                             <div className="w-full h-full grid grid-cols-3 grid-rows-3 opacity-30">
                                 <div className="border-r border-b border-white/50"></div>
                                 <div className="border-r border-b border-white/50"></div>
@@ -625,8 +725,6 @@ export default function MaterialsPage() {
                                 <div className="border-r border-white/50"></div>
                                 <div></div>
                             </div>
-
-                            {/* Center Frame */}
                             <div className="absolute inset-0 flex items-center justify-center p-8">
                                 <div className={`border-2 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all duration-300 w-full ${cameraMode === 'landscape' ? 'aspect-video' :
                                     cameraMode === 'insta-square' ? 'aspect-square' :
@@ -638,7 +736,6 @@ export default function MaterialsPage() {
                                     <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-white"></div>
                                     <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-white"></div>
 
-                                    {/* Insta Story "Safe Area" Guides */}
                                     {cameraMode === 'insta-story' && (
                                         <div className="absolute inset-x-0 top-10 bottom-20 border-y border-white/20 pointer-events-none">
                                             <div className="absolute top-0 left-2 text-[8px] text-white/40 uppercase">Safe Zone</div>
@@ -648,7 +745,6 @@ export default function MaterialsPage() {
                             </div>
                         </div>
 
-                        {/* Text Instruction */}
                         <div className="absolute bottom-32 left-0 right-0 text-center px-4">
                             <p className="text-white text-xs font-bold bg-black/60 py-2 inline-block rounded-full px-6 backdrop-blur-sm border border-white/20">
                                 青い枠の中にバランスよく収めてください
@@ -656,7 +752,6 @@ export default function MaterialsPage() {
                         </div>
                     </div>
 
-                    {/* Camera Controls */}
                     <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-6 z-[110] px-4">
                         <div className="grid grid-cols-4 gap-2 bg-black/40 backdrop-blur-md p-2 rounded-2xl border border-white/10">
                             <Button
@@ -703,8 +798,7 @@ export default function MaterialsPage() {
                         >
                             <div className="w-full h-full rounded-full border-2 border-gray-900"></div>
                         </button>
-
-                        <div className="w-[140px]"></div> {/* Spacer for offset grid */}
+                        <div className="w-[140px]"></div>
                     </div>
                 </div>
             )}

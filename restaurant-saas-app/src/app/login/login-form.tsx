@@ -1,8 +1,14 @@
 'use client'
 
 import { useState, Suspense } from 'react'
+import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
+import {
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    signInWithPopup,
+    GoogleAuthProvider
+} from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +24,21 @@ function LoginFormContent() {
     const [password, setPassword] = useState('')
     const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null)
 
+    async function handleGoogleLogin() {
+        setLoading(true)
+        const provider = new GoogleAuthProvider()
+        try {
+            await signInWithPopup(auth, provider)
+            toast.success('Googleでログインしました')
+            router.push('/dashboard')
+        } catch (error: any) {
+            console.error(error)
+            toast.error('Googleログインに失敗しました')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         setLoading(true)
@@ -27,34 +48,32 @@ function LoginFormContent() {
             if (isLogin) {
                 await signInWithEmailAndPassword(auth, email, password)
                 toast.success('ログインしました')
-                router.push('/')
+                router.push('/dashboard')
             } else {
                 await createUserWithEmailAndPassword(auth, email, password)
                 toast.success('アカウントを作成しました')
-                router.push('/')
+                router.push('/dashboard')
             }
         } catch (error: any) {
             console.error(error)
             let errorMessage = 'エラーが発生しました'
-            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
                 errorMessage = 'メールアドレスまたはパスワードが間違っています'
             } else if (error.code === 'auth/email-already-in-use') {
-                errorMessage = 'このメールアドレスは既に使用されています'
-            } else if (error.code === 'auth/weak-password') {
-                errorMessage = 'パスワードは6文字以上で設定してください'
+                errorMessage = 'このメールアドレスは既に登録されています'
             }
-
             setMessage({ type: 'error', text: errorMessage })
             toast.error(errorMessage)
+        } finally {
             setLoading(false)
         }
     }
 
     return (
         <div className="space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                    <Label htmlFor="email">メールアドレス</Label>
+                    <Label htmlFor="email" className="text-gray-700 font-medium ml-1">メールアドレス</Label>
                     <Input
                         id="email"
                         type="email"
@@ -63,10 +82,11 @@ function LoginFormContent() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={loading}
+                        className="h-12 rounded-xl border-gray-200 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50/30"
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="password">パスワード</Label>
+                    <Label htmlFor="password" university-font-medium className="text-gray-700 font-medium ml-1">パスワード</Label>
                     <Input
                         id="password"
                         type="password"
@@ -75,19 +95,27 @@ function LoginFormContent() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={loading}
+                        className="h-12 rounded-xl border-gray-200 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50/30"
                     />
                 </div>
 
                 {message && (
-                    <div className={`text-sm p-3 rounded-md border ${message.type === 'error'
-                        ? 'bg-red-50 border-red-200 text-red-600'
-                        : 'bg-green-50 border-green-200 text-green-600'
-                        }`}>
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`text-sm p-4 rounded-xl border ${message.type === 'error'
+                            ? 'bg-red-50 border-red-100 text-red-600'
+                            : 'bg-green-50 border-green-100 text-green-600'
+                            }`}>
                         {message.text}
-                    </div>
+                    </motion.div>
                 )}
 
-                <Button className="w-full" type="submit" disabled={loading}>
+                <Button
+                    className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md hover:shadow-lg transition-all"
+                    type="submit"
+                    disabled={loading}
+                >
                     {loading ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -97,34 +125,78 @@ function LoginFormContent() {
                         isLogin ? 'ログイン' : '新規登録'
                     )}
                 </Button>
+
+                <div className="relative my-8">
+                    <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-gray-100" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white px-4 text-gray-400 font-medium">または</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="h-12 rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50 font-bold transition-all flex items-center justify-center gap-2"
+                        onClick={handleGoogleLogin}
+                        disabled={loading}
+                    >
+                        <GoogleIcon className="w-5 h-5" />
+                        Google
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="h-12 rounded-xl border-2 border-[#FF5C00] text-[#FF5C00] hover:bg-[#FF5C00] hover:text-white font-bold transition-all flex items-center justify-center gap-2 group"
+                        onClick={() => {
+                            const clientId = process.env.NEXT_PUBLIC_WHOP_CLIENT_ID;
+                            const redirectUri = encodeURIComponent(`${window.location.origin}/api/auth/whop/callback`);
+                            const authUrl = `https://whop.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid%20email%20profile%20billing:memberships:read`;
+                            window.location.href = authUrl;
+                        }}
+                        disabled={loading}
+                    >
+                        Whop
+                    </Button>
+                </div>
             </form>
 
-            <div className="text-center border-t pt-4">
+            <div className="text-center pt-4">
                 <button
                     type="button"
                     onClick={() => {
                         setIsLogin(!isLogin)
                         setMessage(null)
                     }}
-                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    className="text-sm text-gray-500 hover:text-indigo-600 transition-colors font-medium"
                     disabled={loading}
                 >
-                    {isLogin ? 'アカウントをお持ちでない方はこちら（新規登録）' : '既にアカウントをお持ちの方はこちら（ログイン）'}
+                    {isLogin ? 'アカウントをお持ちでない方（新規作成）' : '既にアカウントをお持ちの方（ログイン）'}
                 </button>
-            </div>
-
-            <div className="text-center text-xs text-gray-400 mt-4">
-                Powered by Firebase Auth
             </div>
         </div>
     )
 }
 
+function GoogleIcon({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 48 48" className={className} xmlns="http://www.w3.org/2000/svg">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+            <path fill="none" d="M0 0h48v48H0z" />
+        </svg>
+    );
+}
+
 export default function LoginForm() {
     return (
         <Suspense fallback={
-            <div className="flex justify-center p-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <div className="flex justify-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
             </div>
         }>
             <LoginFormContent />

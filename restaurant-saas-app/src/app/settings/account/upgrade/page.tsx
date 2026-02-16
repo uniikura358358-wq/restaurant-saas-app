@@ -24,7 +24,7 @@ export default function HPUpgradePage() {
                                 特別グレードアップのご案内
                             </h1>
                             <p className="text-gray-500 max-w-2xl mx-auto text-lg">
-                                ホームページ制作をご利用の会員様だけに、集客を加速させる特別なセットプランをご用意いたしました。サイト維持費込みの特別価格です。
+                                ホームページ制作をご利用の会員様だけに、集客を加速させる特別なセットプランをご用意いたしました。上位プランならWeb維持管理費が無料（100%割引）となります。
                             </p>
                         </header>
 
@@ -49,7 +49,7 @@ export default function HPUpgradePage() {
                                             <span className="text-gray-400 text-sm">/月 (税込)</span>
                                         </div>
                                         <p className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded inline-block">
-                                            HP維持管理費（¥2,980）を含みます
+                                            Web維持管理費（¥500 → ¥0）サービスに含まれます
                                         </p>
                                     </div>
 
@@ -60,12 +60,12 @@ export default function HPUpgradePage() {
                                                 Google口コミ自動返信機能
                                             </li>
                                             <li className="flex gap-3 text-sm font-bold text-gray-700">
-                                                <Smartphone className="w-5 h-5 text-purple-500 shrink-0" />
-                                                インスタ専用ガイドカメラ (正方形/9:16対応)
-                                            </li>
-                                            <li className="flex gap-3 text-sm font-bold text-gray-700">
                                                 <Zap className="w-5 h-5 text-indigo-500 shrink-0" />
                                                 Instagram自動キャプション作成
+                                            </li>
+                                            <li className="flex gap-3 text-sm font-bold text-indigo-600 bg-indigo-50 p-1.5 rounded-lg border border-indigo-100">
+                                                <Sparkles className="w-5 h-5 text-purple-500 shrink-0" />
+                                                AI画像生成: 60回/月
                                             </li>
                                             <li className="flex gap-3 text-sm font-bold text-gray-700">
                                                 <Instagram className="w-5 h-5 text-pink-500 shrink-0" />
@@ -80,10 +80,10 @@ export default function HPUpgradePage() {
 
                                     <div className="bg-gray-50 p-4 rounded-xl space-y-2">
                                         <p className="text-xs text-gray-400">
-                                            通常：機能 ¥9,800 + 維持 ¥2,980 = ¥12,780
+                                            通常：Light ¥2,480 + 維持 ¥500 = ¥2,980
                                         </p>
                                         <p className="text-sm font-bold text-indigo-600 flex items-center gap-1">
-                                            <ArrowRight className="w-4 h-4" /> 月々 2,980円 お得！
+                                            <ArrowRight className="w-4 h-4" /> スタンダードなら維持費 ¥0 !!
                                         </p>
                                     </div>
 
@@ -115,7 +115,7 @@ export default function HPUpgradePage() {
                                             <span className="text-gray-400 text-sm">/月 (税込)</span>
                                         </div>
                                         <p className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded inline-block">
-                                            HP維持管理費（¥2,980）を含みます
+                                            Web維持管理費（¥500 → ¥0）サービスに含まれます
                                         </p>
                                     </div>
 
@@ -127,7 +127,7 @@ export default function HPUpgradePage() {
                                             </li>
                                             <li className="flex gap-3 font-bold text-gray-700">
                                                 <Sparkles className="w-5 h-5 text-blue-500 shrink-0" />
-                                                AI顧客分析・集客アドバイス
+                                                AI画像生成: 90回/月 (最上位)
                                             </li>
                                             <li className="flex gap-3 font-bold text-gray-700">
                                                 <Zap className="w-5 h-5 text-orange-500 shrink-0" />
@@ -142,10 +142,10 @@ export default function HPUpgradePage() {
 
                                     <div className="bg-primary/5 p-4 rounded-xl space-y-2">
                                         <p className="text-xs text-gray-400">
-                                            通常：機能 ¥12,800 + 維持 ¥2,980 = ¥15,780
+                                            通常：Light ¥2,480 + 維持 ¥500 = ¥2,980
                                         </p>
                                         <p className="text-sm font-bold text-primary flex items-center gap-1">
-                                            <ArrowRight className="w-4 h-4" /> 月々 2,980円 お得！
+                                            <ArrowRight className="w-4 h-4" /> プレミアムなら維持費 ¥0 !!
                                         </p>
                                     </div>
 
@@ -161,9 +161,9 @@ export default function HPUpgradePage() {
                                 <Globe className="w-8 h-8" />
                             </div>
                             <div className="flex-1 text-center md:text-left">
-                                <h3 className="font-bold text-blue-900 text-lg">現在のHP維持費は自動的に差し引かれます</h3>
+                                <h3 className="font-bold text-blue-900 text-lg">現在のHP維持手数料は自動的に解除されます</h3>
                                 <p className="text-sm text-blue-700 mt-1">
-                                    アップグレード後は、別途お支払いいただいている維持管理費（¥2,980）は発生いたしません。
+                                    アップグレード後は、Lightプランで発生していたWeb維持費（¥500）は発生いたしません。
                                     すべてプラン料金内でご利用いただけます。
                                 </p>
                             </div>

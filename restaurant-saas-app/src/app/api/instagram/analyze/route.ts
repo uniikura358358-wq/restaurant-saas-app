@@ -1,7 +1,6 @@
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,20 +14,16 @@ const DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash-lite";
 const ANALYZE_TIMEOUT_MS = 20_000;
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
+const ALLOWED_PLANS = ['standard', 'business', 'premium', 'pro'];
+
 async function getActiveModelName() {
     try {
-        const supabase = await createClient();
-        const { data, error } = await supabase
-            .from("system_config")
-            .select("value")
-            .eq("key", "active_ai_model")
-            .single();
-
-        if (error || !data) {
+        const doc = await adminDb.collection("system_config").doc("active_ai_model").get();
+        if (!doc.exists) {
             console.warn("DBからの取得に失敗しました。デフォルト(2.5-flash-lite)を使用します。");
             return DEFAULT_FALLBACK_MODEL;
         }
-        return (data as Pick<SystemConfigRow, "value">).value;
+        return doc.data()?.value || DEFAULT_FALLBACK_MODEL;
     } catch {
         console.warn("DBからの取得に失敗しました。デフォルト(2.5-flash-lite)を使用します。");
         return DEFAULT_FALLBACK_MODEL;
@@ -59,6 +54,29 @@ export async function POST(request: Request) {
         const apiKey = process.env.GOOGLE_API_KEY?.trim();
         if (!apiKey) {
             return NextResponse.json({ error: "GOOGLE_API_KEY が未設定です" }, { status: 500 });
+        }
+
+        // ユーザー認証チェック
+        const authHeader = request.headers.get("Authorization");
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "認証されていません" }, { status: 401 });
+        }
+        const idToken = authHeader.split("Bearer ")[1];
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(idToken);
+        } catch (e) {
+            return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+        }
+        const uid = decodedToken.uid;
+
+        // プラン権限チェック (バックエンド側の防衛線)
+        const userDoc = await adminDb.collection("users").doc(uid).get();
+        const userData = userDoc.data();
+        const userPlan = (userData?.plan || 'Free').toLowerCase();
+
+        if (!ALLOWED_PLANS.includes(userPlan)) {
+            return NextResponse.json({ error: "現在のプランではこの機能を利用できません。アップグレードをご検討ください。" }, { status: 403 });
         }
 
         const contentType = request.headers.get("content-type") || "";
@@ -140,10 +158,18 @@ export async function POST(request: Request) {
         } finally {
             clearTimeout(timeoutId);
         }
-    } catch {
-        return NextResponse.json(
-            { error: "画像解析に失敗しました" },
-            { status: 500, headers: { "Cache-Control": "no-store" } }
-        );
+    } catch (error: any) {
+        console.error("Analyze Error:", error);
+        try {
+            // Try to return a valid JSON error even if build fails? 
+            // Or just return 500.
+            return NextResponse.json(
+                { error: "画像解析に失敗しました" },
+                { status: 500, headers: { "Cache-Control": "no-store" } }
+            );
+        } catch {
+            // Absolute fallback
+            return new NextResponse("Internal Server Error", { status: 500 });
+        }
     }
 }

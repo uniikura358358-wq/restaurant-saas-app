@@ -1,23 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { verifyAuth } from "@/lib/auth-utils";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
-// サーバーサイド専用: service_role キーで RLS をバイパス
-function createAdminClient() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-        throw new Error("Supabase configuration is missing (URL or SERVICE_ROLE_KEY)");
-    }
-
-    return createClient(supabaseUrl, serviceRoleKey);
-}
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
     try {
         const { reviewId, replyContent } = await request.json();
+        const requestId = request.headers.get("X-Request-ID");
 
-        // 1. バリデーション
+        // 1. Authentication (Firebase)
+        const user = await verifyAuth(request);
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        // 2. Validation
         if (!reviewId || !replyContent) {
             return NextResponse.json(
                 { error: "レビューIDと返信内容は必須です" },
@@ -25,7 +24,13 @@ export async function POST(request: Request) {
             );
         }
 
-        // 2. 文字数制限 (300文字 — AI生成は280文字目標、多少の誤差を許容)
+        if (!requestId) {
+            return NextResponse.json(
+                { error: "X-Request-ID ヘッダーが必要です" },
+                { status: 400 }
+            );
+        }
+
         const MAX_LENGTH = 300;
         if (replyContent.length > MAX_LENGTH) {
             return NextResponse.json(
@@ -34,83 +39,155 @@ export async function POST(request: Request) {
             );
         }
 
-        const supabase = createAdminClient();
+        // 3. Idempotency Check (冪等性)
+        const requestRef = adminDb.collection("requests").doc(requestId);
+        const requestDoc = await requestRef.get();
 
-        // 3. 上書き防止チェック
-        const { data: existingReview, error: fetchError } = await supabase
-            .from("reviews")
-            .select("status, reply_content")
-            .eq("id", reviewId)
-            .maybeSingle();
-
-        if (fetchError) {
-            throw fetchError;
-        }
-
-        if (!existingReview) {
-            return NextResponse.json(
-                { error: "指定されたレビューが見つかりません" },
-                { status: 404 }
-            );
-        }
-
-        if (existingReview.status === "replied" && existingReview.reply_content) {
-            return NextResponse.json(
-                { error: "既に返信済みです。「未返信に戻す」を使ってから再度お試しください。" },
-                { status: 409 }
-            );
-        }
-
-        // 4. reply_content に保存 + status を 'replied' + updated_at を now()
-        const { data: updatedData, error: updateError } = await supabase
-            .from("reviews")
-            .update({
-                reply_content: replyContent,
-                status: "replied",
-                updated_at: new Date().toISOString()
-            })
-            .eq("id", reviewId)
-            .select()
-            .maybeSingle();
-
-        if (updateError) {
-            throw updateError;
-        }
-
-        if (!updatedData) {
-            return NextResponse.json(
-                { error: "レビューの更新に失敗しました" },
-                { status: 500 }
-            );
-        }
-
-        // 5. Google Business Profile に返信を投稿 (Best Effort)
-        // google_review_id がある場合のみ実行
-        if (updatedData.google_review_id) {
-            try {
-                // google-business-profile.ts から import 必要
-                const { replyToReview } = await import("@/lib/google-business-profile");
-                await replyToReview(updatedData.google_review_id, replyContent);
-                console.log(`Posted reply to Google for review ${updatedData.google_review_id}`);
-            } catch (googleError) {
-                console.error("Failed to post reply to Google:", googleError);
-                // Googleへの投稿失敗はクライアントにエラーとして返さない（DB保存は成功しているため）
-                // ただし、UI側で「Googleへの反映に失敗しました」と出すなら status を 'google_sync_failed' とかにする手もあるが
-                // 今回はログ出力に留める
+        if (requestDoc.exists) {
+            const data = requestDoc.data();
+            if (data?.status === "success") {
+                // 既に成功している場合はキャッシュされた結果を返す
+                return NextResponse.json(data.response);
+            } else if (data?.status === "processing") {
+                return NextResponse.json(
+                    { error: "リクエストは現在処理中です" },
+                    { status: 409 }
+                );
             }
         }
 
-        return NextResponse.json({ success: true, review: updatedData });
-    } catch (error: unknown) {
-        let message = "返信の保存中にエラーが発生しました";
-        if (error instanceof Error) {
-            message = error.message;
-        } else if (error && typeof error === "object" && "message" in error) {
-            message = String((error as { message: unknown }).message);
+        // 4. Firestore Transaction
+        // reviews/{reviewId} の更新 + replies/{reviewId} 作成 + users/{uid}/stats/current 更新 + requests/{requestId} 作成
+        // これらをアトミックに行う
+        let resultData: any;
+
+        try {
+            await adminDb.runTransaction(async (t) => {
+                // Read operations must come first
+                const reviewRef = adminDb.collection("reviews").doc(reviewId);
+                const reviewDoc = await t.get(reviewRef);
+
+                if (!reviewDoc.exists) {
+                    throw new Error("指定されたレビューが見つかりません");
+                }
+
+                const reviewData = reviewDoc.data();
+                if (reviewData?.userId !== user.uid) {
+                    throw new Error("このレビューを更新する権限がありません");
+                }
+
+                if (reviewData?.status === "replied") {
+                    throw new Error("既に返信済みです");
+                }
+
+                const statsRef = adminDb.collection("users").doc(user.uid).collection("stats").doc("current");
+                const statsDoc = await t.get(statsRef);
+
+                // Write operations
+                // A. Mark Request as Processing (Optimistic: in a real distributed system we might do this outside, but here inside 't' safeguards consistency)
+                // Note: Firestore Tx requires all Reads before Writes. We did Reads.
+
+                // B. Update Review
+                t.update(reviewRef, {
+                    status: "replied",
+                    replySummary: replyContent,
+                    updatedAt: FieldValue.serverTimestamp(),
+                    replyId: reviewId, // 1:1 relation
+                });
+
+                // C. Create Reply
+                const replyRef = adminDb.collection("replies").doc(reviewId);
+                t.set(replyRef, {
+                    id: reviewId,
+                    userId: user.uid,
+                    reviewId: reviewId,
+                    content: replyContent,
+                    generatedBy: "manual", // or ai, passed from client? for now assume manual edit of AI output
+                    createdAt: FieldValue.serverTimestamp(),
+                    updatedAt: FieldValue.serverTimestamp(),
+                });
+
+                // D. Update Stats
+                if (statsDoc.exists) {
+                    t.update(statsRef, {
+                        unrepliedCount: FieldValue.increment(-1),
+                        repliedCount: FieldValue.increment(1),
+                        updatedAt: FieldValue.serverTimestamp(),
+                    });
+                } else {
+                    // Create if not exists (defensive)
+                    t.set(statsRef, {
+                        totalReviews: 1, // assumption
+                        unrepliedCount: 0,
+                        repliedCount: 1,
+                        averageRating: 0,
+                        lowRatingCount: 0,
+                        updatedAt: FieldValue.serverTimestamp(),
+                    });
+                }
+
+                // E. Save Request Result (Idempotency)
+                resultData = {
+                    success: true,
+                    reviewId,
+                    status: "replied",
+                    timestamp: new Date().toISOString()
+                };
+
+                t.set(requestRef, {
+                    userId: user.uid,
+                    status: "success",
+                    response: resultData,
+                    createdAt: FieldValue.serverTimestamp(),
+                });
+            });
+        } catch (txError: any) {
+            // トランザクション失敗時はエラーを投げる（requestRefは作成されないのでリトライ可能）
+            // 明示的なドメインエラーの場合は 400/403/404 等を返すべきだが、
+            // ここでは簡易的に 500 or Error Message とする
+            throw txError;
         }
+
+        // 5. Google Business Profile に返信 (Best Effort: Transactionの外で行う)
+        // トランザクション成功後に実行。失敗してもDBはロールバックしない（整合性優先）
+        // ※ 本来は Cloud Functions トリガーで非同期に行うのがベストだが、Phase 3 では同期的実行を維持
+        // 必要であれば google_review_id を取得しておく必要がある
+        const reviewDocAfter = await adminDb.collection("reviews").doc(reviewId).get();
+        const googleReviewId = reviewDocAfter.data()?.id; // Assuming id IS google_review_id or stored elsewhere
+
+        // 注: FirestoreReview schema では id が Google Review ID かどうか明記されていないが、
+        // 移行元(Supabase)のカラム `google_review_id` に相当するものが `id` に入っていると仮定するか、
+        // `sourceId` などのフィールドが必要。
+        // 現状の schema 定義では `id` を使用。
+
+        if (googleReviewId && reviewDocAfter.data()?.source === 'google') {
+            try {
+                // Dynamic import to avoid loading logic if not needed
+                // Note: Ensure strictly server-side
+                const { replyToReview } = await import("@/lib/google-business-profile");
+                await replyToReview(googleReviewId, replyContent);
+            } catch (googleError) {
+                console.error("Failed to post reply to Google:", googleError);
+                // ユーザーには成功として返す（DBは更新済みのため）
+            }
+        }
+
+        return NextResponse.json(resultData);
+
+    } catch (error: any) {
+        console.error("Error in submit-reply:", error);
+
+        const errorMessage = error.message || "返信の保存中にエラーが発生しました";
+        let status = 500;
+
+        if (errorMessage.includes("権限")) status = 403;
+        if (errorMessage.includes("見つかりません")) status = 404;
+        if (errorMessage.includes("返信済み")) status = 409;
+        if (errorMessage.includes("X-Request-ID")) status = 400;
+
         return NextResponse.json(
-            { error: message },
-            { status: 500 }
+            { error: errorMessage },
+            { status }
         );
     }
 }

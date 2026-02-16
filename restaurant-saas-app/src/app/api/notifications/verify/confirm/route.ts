@@ -8,89 +8,87 @@
  *   → SMS OTPコード検証。{ otp: "123456" } を受け取り、JSONレスポンスを返す。
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { NextResponse } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import type { NotificationConfig } from "@/lib/notification-handler";
+
+export const dynamic = 'force-dynamic';
 
 /**
  * メール確認リンクのコールバック処理（GET）
  */
 export async function GET(request: Request) {
-    const { searchParams, origin } = new URL(request.url);
-    const token = searchParams.get("token");
+    try {
+        const { searchParams, origin } = new URL(request.url);
+        const token = searchParams.get("token");
 
-    if (!token) {
+        if (!token) {
+            return NextResponse.redirect(
+                `${origin}/settings/account?verify_error=missing_token`
+            );
+        }
+
+        // トークン検索
+        const snapshot = await adminDb.collection("verificationCodes")
+            .where("token", "==", token)
+            .where("channel", "==", "email")
+            .where("verified", "==", false)
+            .limit(1)
+            .get();
+
+        if (snapshot.empty) {
+            return NextResponse.redirect(
+                `${origin}/settings/account?verify_error=invalid_token`
+            );
+        }
+
+        const verificationDoc = snapshot.docs[0];
+        const verification = verificationDoc.data();
+        const userId = verification.userId;
+
+        // 有効期限チェック
+        if (verification.expiresAt && new Date(verification.expiresAt.toDate()) < new Date()) {
+            return NextResponse.redirect(
+                `${origin}/settings/account?verify_error=expired_token`
+            );
+        }
+
+        // トークンを検証済みに更新
+        await verificationDoc.ref.update({ verified: true });
+
+        // users/{userId} の notificationConfig を更新
+        const userRef = adminDb.collection("users").doc(userId);
+        const userDoc = await userRef.get();
+
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const currentConfig = (userData?.notificationConfig || {}) as NotificationConfig;
+
+            const updatedConfig: NotificationConfig = {
+                ...currentConfig,
+                email_address: verification.contactValue,
+                email_verified: true,
+            };
+
+            await userRef.update({
+                notificationConfig: updatedConfig,
+                updatedAt: FieldValue.serverTimestamp(),
+            });
+        }
+
         return NextResponse.redirect(
-            `${origin}/settings/account?verify_error=missing_token`
+            `${origin}/settings/account?verified=email`
+        );
+
+    } catch (error: any) {
+        console.error("Verify Confirm Error:", error);
+        // リダイレクトでエラーを伝える
+        const origin = new URL(request.url).origin;
+        return NextResponse.redirect(
+            `${origin}/settings/account?verify_error=server_error`
         );
     }
-
-    const supabase = await createClient();
-
-    // ユーザー認証チェック
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-        return NextResponse.redirect(
-            `${origin}/login?error=auth_required`
-        );
-    }
-
-    // トークン検索
-    const { data: verification, error: fetchError } = await supabase
-        .from("notification_verifications")
-        .select("*")
-        .eq("token", token)
-        .eq("user_id", user.id)
-        .eq("channel", "email")
-        .eq("verified", false)
-        .maybeSingle();
-
-    if (fetchError || !verification) {
-        return NextResponse.redirect(
-            `${origin}/settings/account?verify_error=invalid_token`
-        );
-    }
-
-    // 有効期限チェック
-    if (new Date(verification.expires_at) < new Date()) {
-        return NextResponse.redirect(
-            `${origin}/settings/account?verify_error=expired_token`
-        );
-    }
-
-    // トークンを検証済みに更新
-    await supabase
-        .from("notification_verifications")
-        .update({ verified: true })
-        .eq("id", verification.id);
-
-    // notification_config のメールアドレスと検証フラグを更新
-    const { data: settings } = await supabase
-        .from("store_settings")
-        .select("notification_config")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-    if (settings) {
-        const currentConfig = (settings.notification_config || {}) as NotificationConfig;
-        const updatedConfig: NotificationConfig = {
-            ...currentConfig,
-            email_address: verification.contact_value,
-            email_verified: true,
-        };
-
-        await supabase
-            .from("store_settings")
-            .update({
-                notification_config: updatedConfig,
-                updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.id);
-    }
-
-    return NextResponse.redirect(
-        `${origin}/settings/account?verified=email`
-    );
 }
 
 /**
@@ -107,42 +105,42 @@ export async function POST(request: Request) {
             );
         }
 
-        const supabase = await createClient();
-
         // ユーザー認証チェック
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            return NextResponse.json(
-                { error: "認証されていません" },
-                { status: 401 }
-            );
+        const authHeader = request.headers.get("Authorization");
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "認証されていません" }, { status: 401 });
         }
+        const idToken = authHeader.split("Bearer ")[1];
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(idToken);
+        } catch (e) {
+            return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+        }
+        const uid = decodedToken.uid;
 
         // OTPコード検索
-        const { data: verification, error: fetchError } = await supabase
-            .from("notification_verifications")
-            .select("*")
-            .eq("token", otp)
-            .eq("user_id", user.id)
-            .eq("channel", "sms")
-            .eq("verified", false)
-            .maybeSingle();
+        const snapshot = await adminDb.collection("verificationCodes")
+            .where("token", "==", otp)
+            .where("userId", "==", uid)
+            .where("channel", "==", "sms")
+            .where("verified", "==", false)
+            .limit(1)
+            .get();
 
-        if (fetchError || !verification) {
+        if (snapshot.empty) {
             return NextResponse.json(
                 { error: "認証コードが正しくありません" },
                 { status: 400 }
             );
         }
 
-        // 有効期限チェック
-        if (new Date(verification.expires_at) < new Date()) {
-            // 期限切れトークンを削除
-            await supabase
-                .from("notification_verifications")
-                .delete()
-                .eq("id", verification.id);
+        const verificationDoc = snapshot.docs[0];
+        const verification = verificationDoc.data();
 
+        // 有効期限チェック
+        if (verification.expiresAt && new Date(verification.expiresAt.toDate()) < new Date()) {
+            await verificationDoc.ref.delete();
             return NextResponse.json(
                 { error: "認証コードの有効期限が切れています。再送信してください。" },
                 { status: 400 }
@@ -150,49 +148,37 @@ export async function POST(request: Request) {
         }
 
         // トークンを検証済みに更新
-        await supabase
-            .from("notification_verifications")
-            .update({ verified: true })
-            .eq("id", verification.id);
+        await verificationDoc.ref.update({ verified: true });
 
-        // notification_config の電話番号と検証フラグを更新
-        const { data: settings } = await supabase
-            .from("store_settings")
-            .select("notification_config")
-            .eq("user_id", user.id)
-            .maybeSingle();
+        // users/{userId} の notificationConfig を更新
+        const userRef = adminDb.collection("users").doc(uid);
+        const userDoc = await userRef.get();
 
-        if (settings) {
-            const currentConfig = (settings.notification_config || {}) as NotificationConfig;
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const currentConfig = (userData?.notificationConfig || {}) as NotificationConfig;
+
             const updatedConfig: NotificationConfig = {
                 ...currentConfig,
-                phone_number: verification.contact_value,
+                phone_number: verification.contactValue,
                 phone_verified: true,
             };
 
-            await supabase
-                .from("store_settings")
-                .update({
-                    notification_config: updatedConfig,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("user_id", user.id);
+            await userRef.update({
+                notificationConfig: updatedConfig,
+                updatedAt: FieldValue.serverTimestamp(),
+            });
         }
 
         return NextResponse.json({
             success: true,
             message: "電話番号が認証されました",
         });
-    } catch (error: unknown) {
-        console.error("OTP検証エラー:", error);
-        let message = "認証に失敗しました";
-        if (error instanceof Error) {
-            message = error.message;
-        } else if (error && typeof error === "object" && "message" in error) {
-            message = String((error as { message: unknown }).message);
-        }
+
+    } catch (error: any) {
+        console.error("OTP Verification Error:", error);
         return NextResponse.json(
-            { error: message },
+            { error: "Internal Server Error" },
             { status: 500 }
         );
     }

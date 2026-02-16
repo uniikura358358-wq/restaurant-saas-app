@@ -98,13 +98,10 @@ export const STRIPE_PLANS = {
     HP_CREATION: {
         initial: 39800,
         maintenance: {
-            monthly: 2480,
-            yearly: 25800 // 13% OFF (Same as single plans)
+            monthly: 500, // Light Plan maintenance add-on
+            yearly: 5200
         },
-        daily_menu: {
-            monthly: 3480,
-            yearly: 36200
-        }
+        // For Std/Premium it is 0
     }
 };
 
