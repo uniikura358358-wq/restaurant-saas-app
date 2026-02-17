@@ -7,14 +7,15 @@
   - [x] `useAuth` の厳格化と `storeId` 取得の共通化
   - [x] Server Side Auth Verification (`verifyIdToken`) の実装
   - [x] `submit-reply` API の認証を Firebase Auth に変更
-- [ ] **Phase 2: Data Unification (Firestore Migration)**
-  - [ ] **Stats Design**: `tenants/{id}/stats` スキーマ定義
-  - [ ] **Pagination Logic**: `orderBy(createdAt, id)` + `startAfter` 実装
-  - [ ] `src/app/dashboard/page.tsx` を Firestore Admin SDK 読み取りに変更
-- [ ] **Phase 3: API Reliability**
-  - [ ] **Idempotency**: `requests/{requestId}` コレクション作成
-  - [ ] **Transaction**: 返信保存APIに「Stats更新 + 冪等性チェック」を実装
-  - [ ] `ReviewReplyButton` からの API 呼び出しに `requestId` (UUID) を付与
-- [ ] **Phase 4: Optimization & Cleanup**
-  - [ ] Firestore Indexes (複合インデックス) の設定
-  - [ ] Supabase 関連コード完全削除
+- [x] **Phase 2: Data Unification (Firestore Migration)** `[x]`
+  - [x] **Stats Design**: `tenants/{id}/stats` スキーマ定義
+  - [x] **Dashboard Updates**: `DashboardStats` を用いた集計表示への移行
+  - [x] `src/app/dashboard/page.tsx` を Firestore Admin SDK 読み取りに変更
+- [x] **Phase 3: API Reliability** `[x]`
+  - [x] **Idempotency**: `requests/{requestId}` コレクションと `X-Request-ID` によるチェック実装
+  - [x] **Transaction**: `submit-reply` APIに「Stats更新 + 冪等性チェック」を完全実装
+  - [x] **Validation**: 返信文字数制限(300文字)と入力値検証の強化
+- [x] **Phase 4: Optimization & Cleanup** `[x]`
+  - [x] **Build Fix**: `firebase-admin.ts` の環境変数パース堅牢化と API ルートの静的生成エラー解消
+  - [x] **Supabaseクリーンアップ**: Supabase関連コード、パッケージ、環境設定の完全削除
+  - [x] **資産化**: `10_進行中プロジェクト` & `20_開発ノウハウ` への最新仕様同期

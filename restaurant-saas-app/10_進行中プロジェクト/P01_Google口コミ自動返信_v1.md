@@ -1,4 +1,4 @@
-# P01_Google口コミ自動返信_v1.md (Overwritten)
+# P01_Google口コミ自動返信_v1.md
 
 ## 概要
 
@@ -32,4 +32,4 @@ Google Business Profile (GBP) の口コミを自動取得し、{{SERVICE_NAME}} 
 
 ## Next Step
 
-Google My Business API の Webhook 連携（即時通知・自動返信トリガー）の実装。
+Google My Business API の Webhook 連携（即時通知・自動返答トリガー）の実装。
