@@ -1,27 +1,33 @@
 import * as admin from "firebase-admin";
 
 // Safe parsing of service account key
-let serviceAccount;
-try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || "{}");
-} catch (e) {
-    console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. using empty object.");
-    serviceAccount = {};
+let serviceAccount: any = null;
+const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+if (rawKey && rawKey.trim()) {
+    try {
+        // 改行コードが含まれている可能性があるため、フィルタリング等が必要な場合があるが、まずはパース
+        serviceAccount = JSON.parse(rawKey);
+    } catch (e) {
+        console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Admin features may be limited.");
+    }
 }
 
 if (!admin.apps.length) {
     try {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-        });
-    } catch (error) {
-        console.error("Firebase Admin initialization failed (likely due to build-time dummy env vars):", error);
-        // Fallback: Try initializing without credentials to allow build to proceed (auth/db exports won't verify but won't crash immediately)
-        try {
-            if (!admin.apps.length) admin.initializeApp();
-        } catch (e) {
-            console.warn("Fallback initialization also failed:", e);
+        if (serviceAccount && serviceAccount.project_id) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+                projectId: serviceAccount.project_id
+            });
+        } else {
+            // Fallback: サービスアカウントがない場合は、少なくともプロジェクトIDが環境変数にあればそれを使う
+            admin.initializeApp({
+                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID
+            });
         }
+    } catch (error) {
+        console.error("Firebase Admin initialization failed:", error);
     }
 }
 

@@ -9,8 +9,38 @@ import { StoreData, UserProfile } from "@/types/firestore";
  */
 export async function getUserProfile(idToken: string) {
     try {
-        const decodedToken = await adminAuth.verifyIdToken(idToken);
-        const uid = decodedToken.uid;
+        let uid: string;
+
+        // 開発環境用のデモトークン対応
+        if (process.env.NODE_ENV === "development" && idToken === "demo-token") {
+            uid = "demo-user-id";
+            return {
+                success: true,
+                user: {
+                    uid: "demo-user-id",
+                    email: "demo@example.com",
+                    displayName: "デモユーザー",
+                    plan: "Standard",
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                },
+                store: {
+                    storeName: "デモ店舗 (Demo Store)",
+                    ownerUid: "demo-user-id",
+                    aiTone: "polite",
+                    replySignature: "店主より",
+                    websiteMaterials: {
+                        catchCopy: "こだわりの自家製麺と、秘伝のスープをお楽しみください。",
+                        images: {}
+                    },
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                } as StoreData
+            };
+        } else {
+            const decodedToken = await adminAuth.verifyIdToken(idToken);
+            uid = decodedToken.uid;
+        }
 
         const [userDoc, storeDoc] = await Promise.all([
             adminDb.collection("users").doc(uid).get(),
@@ -23,7 +53,7 @@ export async function getUserProfile(idToken: string) {
         return { success: true, user, store };
     } catch (error) {
         console.error("Error fetching user profile:", error);
-        return { success: false, error: "Failed to fetch profile" };
+        return { success: false, error: "Failed to fetch profile (Firestore offline or invalid auth)" };
     }
 }
 

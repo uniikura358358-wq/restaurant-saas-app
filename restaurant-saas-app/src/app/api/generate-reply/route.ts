@@ -1,10 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGenerativeModel } from "@/lib/vertex-ai";
 import { NextResponse } from "next/server";
 import { buildGeneratorPrompt } from "@/lib/review-reply-generator";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { sanitizeAiOutput } from "@/lib/review-handler";
 
 import { verifyAuth } from "@/lib/auth-utils";
+import { checkAiQuota, incrementAiUsage } from "@/lib/ai-quota";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,21 +28,33 @@ export async function POST(request: Request) {
         }
 
         // Firestore からユーザープロファイル（プラン情報）を取得
-        const profileDoc = await adminDb.collection("profiles").doc(userId).get();
-        const profile = profileDoc.data();
+        let profile = null;
+        let planName = "Light Plan";
 
-        if (!profile) {
-            // プロフィールがない場合は初期値を想定（またはエラー）
-            console.warn("User profile not found in Firestore for:", userId);
+        try {
+            const profileDoc = (adminDb && typeof adminDb.collection === 'function')
+                ? await adminDb.collection("users").doc(userId).get()
+                : null;
+
+            profile = profileDoc?.exists ? profileDoc.data() : null;
+            planName = profile?.plan_name || profile?.planName || "Light Plan";
+
+            if (!profile) {
+                console.warn("User profile not found in Firestore for:", userId);
+            }
+        } catch (dbError) {
+            console.error("Firestore Profile Fetch Error (Falling back to default):", dbError);
+            // DBエラー時はログのみ出力し、デフォルトプランで継続
         }
 
-        // クォータチェック (簡易版: Firestore のカウントを参照)
-        const planName = profile?.plan_name || "free";
-        const aiCount = profile?.ai_count || 0;
-        const limit = planName === "premium" ? 1000 : 30; // 暫定リミット
-
-        if (aiCount >= limit) {
-            return NextResponse.json({ error: "AI生成の利用制限に達しました。プランをアップグレードしてください。" }, { status: 403 });
+        // 新しいクォータチェック (DBエラー時はスキップして許可)
+        try {
+            const quotaResult = await checkAiQuota(userId, planName, 'text');
+            if (!quotaResult.allowed) {
+                return NextResponse.json({ error: quotaResult.reason }, { status: 403 });
+            }
+        } catch (quotaError) {
+            console.error("Quota check failed due to DB error (Proceeding with default permit):", quotaError);
         }
 
         if (profile?.plan_status === "locked") {
@@ -51,9 +64,10 @@ export async function POST(request: Request) {
             );
         }
 
+        // Vertex AI ではサービスアカウントキーを使用するため、GOOGLE_API_KEY の存在チェックは任意（警告のみ）にするか削除
         const apiKey = process.env.GOOGLE_API_KEY?.trim();
         if (!apiKey) {
-            return NextResponse.json({ error: "GOOGLE_API_KEY が未設定です" }, { status: 500 });
+            console.warn("GOOGLE_API_KEY is not set, but Vertex AI will use Service Account if available.");
         }
 
         const body = await request.json();
@@ -67,15 +81,15 @@ export async function POST(request: Request) {
         }
 
         const truncatedReviewText = reviewText.slice(0, MAX_REVIEW_TEXT_LENGTH);
-        const genAI = new GoogleGenerativeAI(apiKey);
 
-        const TARGET_MODELS = ['gemini-3-flash-preview', 'gemini-2.5-flash'];
+        // Vertex AI 移行 (規則: Main: 3-flash-preview, Sub: 2.5-flash)
+        const targetModels = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash'];
         let responseText: string | null = null;
         let lastError: unknown = null;
 
-        for (const modelName of TARGET_MODELS) {
+        for (const modelName of targetModels) {
             try {
-                const model = genAI.getGenerativeModel({ model: modelName });
+                const model = getGenerativeModel(modelName);
                 const prompt = buildGeneratorPrompt({
                     reviewText: truncatedReviewText,
                     starRating,
@@ -83,7 +97,7 @@ export async function POST(request: Request) {
                     config,
                 });
 
-                const modelTimeout = modelName.includes("gemini-3") ? 30_000 : 10_000;
+                const modelTimeout = modelName.includes("pro") ? 40_000 : 25_000;
 
                 const result = await Promise.race([
                     model.generateContent(prompt),
@@ -92,50 +106,37 @@ export async function POST(request: Request) {
                     ),
                 ]);
 
-                responseText = (result as any).response.text();
-                break;
+                // Vertex AI SDK のレスポンス形式
+                const response = (result as any).response;
+                if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    responseText = response.candidates[0].content.parts[0].text;
+                } else {
+                    // フォールバック
+                    responseText = typeof (result as any).response.text === 'function'
+                        ? (result as any).response.text()
+                        : null;
+                }
+
+                if (responseText) break;
             } catch (error: unknown) {
-                console.warn(`Error in ${modelName}:`, error);
+                console.warn(`Error in Vertex AI ${modelName}:`, error);
                 lastError = error;
             }
         }
 
         if (!responseText) {
+            const errorMsg = lastError instanceof Error ? lastError.message : "Unknown error";
             return NextResponse.json(
-                { error: "AI応答の生成中にエラーが発生しました。" },
+                { error: `AI応答の生成中にエラーが発生しました。(${errorMsg})` },
                 { status: 500 }
             );
         }
 
-        // Firestore クォータのインクリメントと返信の保存
+        // Firestore クォータのインクリメント (円ベースの内部予算を減算)
         try {
-            const batch = adminDb.batch();
-            const profileRef = adminDb.collection("profiles").doc(userId);
-            batch.update(profileRef, {
-                ai_count: (profile?.ai_count || 0) + 1
-            });
-
-            if (reviewId) {
-                const replyData = {
-                    reply: responseText,
-                    createdAt: new Date(),
-                    starRating,
-                    customerName
-                };
-                // client-side db-actions ではなく server-side で保存するように後で調整するが
-                // 現状は Admin SDK で直接保存が安全
-                const replyRef = adminDb.collection("replies").doc(String(reviewId));
-                batch.set(replyRef, {
-                    ...replyData,
-                    userId,
-                    reviewId,
-                    updatedAt: new Date(),
-                }, { merge: true });
-            }
-
-            await batch.commit();
+            await incrementAiUsage(userId, 'text');
         } catch (dbError) {
-            console.error("Firestore update failed:", dbError);
+            console.error("Firestore quota update failed:", dbError);
         }
 
         const sanitizedReply = sanitizeAiOutput(responseText);
@@ -144,10 +145,21 @@ export async function POST(request: Request) {
             { reply: sanitizedReply },
             { headers: { "Cache-Control": "no-store" } }
         );
-    } catch (error: unknown) {
-        console.error("Generate Reply Error:", error);
+    } catch (error: any) {
+        const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        console.error("Generate Reply Unexpected Error:", {
+            message: error?.message,
+            stack: error?.stack,
+            projectId: projectId
+        });
+
+        let detail = error?.message || "Unknown Error";
+        if (error?.stack?.includes("VertexAI")) {
+            detail = `VertexAI Error: ${detail}`;
+        }
+
         return NextResponse.json(
-            { error: "AI応答の生成中に予期せぬエラーが発生しました。" },
+            { error: `予期せぬエラーが発生しました。[Project: ${projectId}] (${detail})` },
             { status: 500 }
         );
     }

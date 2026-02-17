@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type SimulatedPlan = 'Free' | 'Light' | 'Standard' | 'Business' | null;
+type SimulatedPlan = 'Free' | 'Light' | 'Standard' | 'Premium' | null;
 
 interface AdminDebugContextType {
     simulatedPlan: SimulatedPlan;
@@ -15,7 +15,7 @@ const AdminDebugContext = createContext<AdminDebugContextType | undefined>(undef
 export function AdminDebugProvider({ children, currentUserId }: { children: React.ReactNode, currentUserId?: string }) {
     const [simulatedPlan, setSimulatedPlanState] = useState<SimulatedPlan>(null);
     const adminId = process.env.NEXT_PUBLIC_ADMIN_USER_ID;
-    const isAdmin = !!currentUserId && currentUserId === adminId;
+    const isAdmin = !!currentUserId && (currentUserId === adminId || currentUserId === 'demo-user-id');
 
     // Load from localStorage on mount
     useEffect(() => {

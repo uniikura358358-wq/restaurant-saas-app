@@ -1,34 +1,26 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-
-// Mock function to simulate Gemini API call since the model name is specific/placeholder
-async function callGeminiAPI(prompt: string, model: string) {
-    // In a real implementation:
-    // const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    // const model = genAI.getGenerativeModel({ model: modelName });
-    // ...
-
-    // Simulate latency
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    return "【極上の一杯】こだわりの自家製麺と、創業以来継ぎ足された秘伝のスープ。心まで温まる至福のひとときをお楽しみください。";
-}
+import { getGenerativeModel } from "@/lib/vertex-ai";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { text, model } = body;
+        const { text, model: requestedModel } = body;
 
-        console.log(`[AI Adjust] Using model: ${model}, Input: ${text}`);
+        const modelName = requestedModel || 'gemini-1.5-flash';
+        console.log(`[AI Adjust] Using Vertex AI model: ${modelName}, Input: ${text}`);
 
-        // Mock response for "gemini-3-flash-preview" as requested
-        const result = await callGeminiAPI(text, model || 'gemini-3-flash-preview');
+        const model = getGenerativeModel(modelName);
+        const prompt = `以下の文章を、飲食店のキャプションとしてより魅力的で読みやすい形に調整してください。装飾文字などは控えめに、清潔感のある表現を心がけてください。\n\n原文:\n${text}`;
 
-        return NextResponse.json({ result });
+        const result = await model.generateContent(prompt);
+        const response = (result as any).response;
+        const adjustedText = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+        return NextResponse.json({ result: adjustedText });
     } catch (error) {
-        console.error('AI Adjustment Error:', error);
+        console.error('AI Adjustment Error (Vertex AI):', error);
         return NextResponse.json(
-            { error: 'Failed to adjust text' },
+            { error: 'Failed to adjust text via Vertex AI' },
             { status: 500 }
         );
     }

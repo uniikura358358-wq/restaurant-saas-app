@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { STRIPE_PLANS } from '@/lib/stripe/config';
 import { toast } from 'sonner';
-import { Check, Loader2, ArrowRight, Star, ShieldCheck, Zap, Globe, LayoutTemplate, Sparkles, MessageSquare, Bot, Instagram, Smartphone } from 'lucide-react';
+import { Check, Loader2, ArrowRight, Star, ShieldCheck, Zap, Globe, LayoutTemplate, Sparkles, MessageSquare, Bot, Instagram, Smartphone, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CustomerSupportChat } from '@/components/CustomerSupportChat';
@@ -78,7 +78,7 @@ function PlansContent() {
         (billingCycle === 'year' ? 83300 : 7980 * 12) +
         (billingCycle === 'year' ? 25800 : 2480 * 12);
 
-    const premiumPrice = billingCycle === 'year' ? STRIPE_PLANS.BUSINESS_PREMIUM.yearly.price : STRIPE_PLANS.BUSINESS_PREMIUM.price * 12;
+    const premiumPrice = billingCycle === 'year' ? 147000 : 14800 * 12;
     const premiumSavings = singlesBundlePrice - premiumPrice;
 
     return (
@@ -121,14 +121,10 @@ function PlansContent() {
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="text-center mb-12">
-                    <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 mb-6 leading-tight">
+                    <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-6 leading-tight">
                         24時間365日、AIがあなたの店の<br />
                         <span className="bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">「最強の営業マン」</span>に。
                     </h2>
-                    <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-                        集客の苦労を自動的な成長へ。リスクは一切ありません。<br />
-                        <span className="font-bold text-gray-900">初期費用0円・契約の縛りなし。</span>今日から、最新のAIをあなたの仲間に。
-                    </p>
 
                     {/* Billing Toggle */}
                     <div className="flex items-center justify-center gap-4 bg-white inline-flex rounded-full p-1 border shadow-sm relative">
@@ -165,72 +161,86 @@ function PlansContent() {
                 </div>
 
                 {/* Plans Grid - 3 Columns for Light, Standard, Premium */}
-                <div className="grid md:grid-cols-3 gap-4 md:gap-8 items-stretch px-4 md:px-6 py-12 max-w-7xl mx-auto relative">
+                <div className="grid md:grid-cols-[0.9fr_1.2fr_0.9fr] gap-6 md:gap-10 items-start px-4 md:px-8 py-12 max-w-[1400px] mx-auto relative">
 
                     {/* Light Plan */}
-                    <div className="flex flex-col h-full group order-2 md:order-1 transition-all duration-300 md:hover:scale-105">
-                        <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 relative flex flex-col h-full overflow-hidden">
+                    <div className="flex flex-col group order-2 md:order-1 transition-all duration-300 md:hover:scale-105">
+                        <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 relative flex flex-col overflow-hidden">
                             {billingCycle === 'year' && (
                                 <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg z-20 shadow-sm">
                                     🥈 13% OFF
                                 </div>
                             )}
-                            <div className="p-8 pb-10 flex flex-col h-full">
-                                <div className="h-[90px] mb-6">
+                            <div className="p-8 pb-4 flex flex-col items-center text-center">
+                                <div className="mb-6 flex flex-col items-center">
                                     <h3 className="text-2xl font-bold text-gray-900">Light Plan</h3>
-                                    <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none text-[10px] font-bold px-2 py-0">Googleマップ対策</Badge>
-                                    <p className="text-[11px] text-gray-500 font-medium leading-relaxed mt-2">
-                                        まずはここから、お店の認知度アップ。
+                                    <Badge className="mt-4 bg-blue-100 text-blue-700 hover:bg-blue-100 border-none text-xs font-bold px-2 py-0.5">Googleマップ対策</Badge>
+                                    <p className="text-[13.5px] text-gray-500 font-medium leading-relaxed mt-2.5">
+                                        新規の集客を伸ばしたいお店におすすめです。
                                     </p>
                                 </div>
 
-
-                                <div className="mb-8 min-h-[65px]">
-                                    <span className="text-4xl font-black text-gray-900">
-                                        ¥{billingCycle === 'year' ? '39,800' : '3,980'}
-                                    </span>
-                                    <span className="text-gray-500 font-bold text-sm">/{billingCycle === 'year' ? '年' : '月'}</span>
-                                </div>
-                                {billingCycle === 'year' && (
-                                    <p className="text-[11px] text-red-500 font-extrabold mt-1">
-                                        年払いで ¥{(3980 * 12 - 39800).toLocaleString()} お得
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="flex-grow px-8">
-                                <ul className="space-y-4 text-sm text-gray-600 mb-8">
-                                    <li className="flex gap-3 text-gray-900 font-bold items-center">
-                                        <Check className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                                        Google口コミ一元管理
-                                    </li>
-                                    <li className="flex gap-3 items-center">
-                                        <Check className="w-5 h-5 text-blue-500 flex-shrink-0" />
-                                        AI自動返信 / 半自動返信
-                                    </li>
-                                    <li className="flex gap-3 items-center">
-                                        <Sparkles className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                                        <span className="font-bold">AI画像生成: 30回/月</span>
-                                    </li>
-                                    <li className="flex gap-3 items-center">
-                                        <ShieldCheck className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                        <span className="font-bold text-red-600">低評価緊急通知機能</span>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            <div className="mt-auto p-8 pt-0 space-y-4">
-                                <Button
-                                    variant="outline"
-                                    className="w-full border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700 font-bold h-12 rounded-xl transition-all"
-                                    onClick={() => handleCheckout(
-                                        billingCycle === 'year' ? STRIPE_PLANS.LIGHT.yearly.id : STRIPE_PLANS.LIGHT.id,
-                                        'Light Plan'
+                                <div className="mb-6 flex flex-col items-center">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-4xl font-black text-gray-900">
+                                            ¥{billingCycle === 'year' ? '39,800' : '3,980'}
+                                        </span>
+                                        <span className="text-gray-500 font-bold text-sm">/{billingCycle === 'year' ? '年' : '月'}</span>
+                                    </div>
+                                    {billingCycle === 'year' && (
+                                        <p className="text-[11px] text-red-500 font-extrabold mt-1">
+                                            年払いで ¥{(3980 * 12 - 39800).toLocaleString()} お得
+                                        </p>
                                     )}
-                                    disabled={!!processingId}
-                                >
-                                    選択する
-                                </Button>
+                                </div>
+
+                                <div className="w-full">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700 font-bold h-12 rounded-xl transition-all"
+                                        onClick={() => handleCheckout(
+                                            billingCycle === 'year' ? STRIPE_PLANS.LIGHT.yearly.id : STRIPE_PLANS.LIGHT.id,
+                                            'Light Plan'
+                                        )}
+                                        disabled={!!processingId}
+                                    >
+                                        選択する
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex-grow px-8 pb-8 flex flex-col items-center text-center">
+                                <p className="text-[14.5px] text-blue-600 font-bold mb-5">
+                                    MEO対策（マップ検索順位の向上）
+                                </p>
+                                <div className="flex flex-col items-center w-full">
+                                    <div className="inline-flex flex-col items-start space-y-5">
+                                        <div className="flex gap-3 text-gray-900 font-bold items-center whitespace-nowrap">
+                                            <div className="w-8 flex-shrink-0 flex justify-center">
+                                                <Check className="w-6 h-6 text-blue-500" />
+                                            </div>
+                                            <span>Google口コミ一元管理</span>
+                                        </div>
+                                        <div className="flex gap-3 items-center whitespace-nowrap text-gray-700 font-bold">
+                                            <div className="w-8 flex-shrink-0 flex justify-center">
+                                                <Check className="w-6 h-6 text-blue-500" />
+                                            </div>
+                                            <span>AI自動返信 / 半自動返信</span>
+                                        </div>
+                                        <div className="flex gap-3 items-center whitespace-nowrap">
+                                            <div className="w-8 flex-shrink-0 flex justify-center">
+                                                <Sparkles className="w-6 h-6 text-indigo-500" />
+                                            </div>
+                                            <span className="font-bold text-indigo-600 underline decoration-indigo-200 decoration-2 underline-offset-4">AI売上分析・経営帳簿</span> <span className="text-[10px] text-orange-500 font-bold ml-1">(開発予定)</span>
+                                        </div>
+                                        <div className="flex gap-3 items-center whitespace-nowrap">
+                                            <div className="w-8 flex-shrink-0 flex justify-center">
+                                                <ShieldCheck className="w-6 h-6 text-red-500" />
+                                            </div>
+                                            <span className="font-bold text-red-600">低評価緊急通知機能</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -250,60 +260,31 @@ function PlansContent() {
                                 </div>
                             )}
 
-                            <div className="p-8 pb-4 flex flex-col h-full mt-2">
-                                <div className="h-[90px] mb-4">
+                            <div className="px-5 md:px-7 py-8 pb-4 flex flex-col items-center text-center">
+                                <div className="mb-4 flex flex-col items-center">
                                     <h3 className="text-3xl font-black text-orange-900 tracking-tight">Standard Plan</h3>
-                                    <p className="text-xs text-orange-600 font-bold leading-relaxed mt-2 bg-orange-50 inline-block px-2 py-1 rounded">
+                                    <p className="text-sm md:text-[15px] text-orange-600 font-extrabold leading-relaxed mt-2 bg-orange-50/80 inline-block px-4 py-2 rounded-2xl border border-orange-100/50 shadow-sm text-center">
                                         新規・リピーターを確実にキャッチ！<br />
-                                        インスタ連携で「お店のファン」を倍増。
+                                        Instagram連携半自動投稿システムで<br />
+                                        「お店のファン」を倍増。
                                     </p>
                                 </div>
 
-                                <div className="mb-6 min-h-[65px] border-b border-orange-100 pb-4">
-                                    <div className="flex items-baseline gap-1">
+                                <div className="mb-6 border-b border-orange-100 pb-4 flex flex-col items-center">
+                                    <div className="flex items-baseline justify-center gap-1">
                                         <span className="text-6xl font-black tracking-tighter text-orange-600 drop-shadow-sm">
                                             ¥{billingCycle === 'year' ? '97,600' : '9,800'}
                                         </span>
                                         <span className="text-gray-500 font-bold text-sm">/{billingCycle === 'year' ? '年' : '月'}</span>
                                     </div>
                                     {billingCycle === 'year' && (
-                                        <p className="text-xs text-red-600 font-black mt-2 bg-red-50 inline-block px-3 py-1 rounded-full animate-pulse">
+                                        <p className="text-xs text-red-600 font-black mt-2 bg-red-50 inline-block px-3 py-1 rounded-full animate-pulse text-center">
                                             <Zap className="w-3 h-3 inline mr-1" />年払いで ¥{(9800 * 12 - 97600).toLocaleString()} お得
                                         </p>
                                     )}
                                 </div>
 
-                                <div className="flex-grow space-y-5">
-                                    <ul className="space-y-4 text-sm text-gray-700 mb-8">
-                                        <li className="flex gap-3 font-bold items-center bg-orange-50 p-3 rounded-xl border border-orange-100 text-orange-800">
-                                            <Star className="w-4 h-4 text-orange-500 flex-shrink-0 fill-orange-500" />
-                                            Light Planの全機能
-                                        </li>
-                                        <li className="flex gap-3 font-bold text-gray-900 items-start">
-                                            <div className="bg-orange-100 p-1 rounded-full mt-0.5">
-                                                <Check className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                                            </div>
-                                            <div>
-                                                インスタ半自動投稿
-                                                <span className="text-[10px] font-bold text-white bg-gradient-to-r from-red-500 to-pink-500 px-2 py-0.5 rounded-full ml-2 shadow-sm inline-block transform -translate-y-0.5">
-                                                    爆速集客
-                                                </span>
-                                            </div>
-                                        </li>
-                                        <li className="flex gap-3 font-bold text-gray-900 items-start">
-                                            <div className="bg-indigo-100 p-1 rounded-full mt-0.5">
-                                                <Sparkles className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                                            </div>
-                                            <div>AI画像生成: <span className="text-lg font-black text-indigo-600">60回</span>/月</div>
-                                        </li>
-                                        <li className="flex gap-3 font-bold text-orange-800 items-center bg-orange-100/60 p-2 rounded-lg border border-orange-200">
-                                            <Globe className="w-4 h-4 flex-shrink-0" />
-                                            <div>Webサイト維持管理費: <span className="text-lg font-black">¥0</span> (込)</div>
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                <div className="mt-auto pt-4 space-y-4">
+                                <div className="w-full mb-4">
                                     <Button
                                         className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-xl shadow-orange-200 font-black h-16 rounded-2xl text-xl transform transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98]"
                                         onClick={() => handleCheckout(
@@ -314,21 +295,60 @@ function PlansContent() {
                                     >
                                         {processingId ? <Loader2 className="animate-spin w-6 h-6" /> : '今すぐ無料で始める'}
                                     </Button>
-                                    <p className="text-[10px] text-gray-500 text-center font-bold flex items-center justify-center gap-1">
-                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                        92%の店舗様がこちらを選んでいます
-                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex-grow space-y-4 w-full flex flex-col items-center px-5 md:px-7 pb-8">
+                                <div className="bg-blue-50/50 rounded-2xl border-2 border-blue-200 p-4 mb-3 shadow-sm w-full flex flex-col items-center">
+                                    <div className="flex flex-col items-center w-full">
+                                        <div className="inline-flex flex-col items-start space-y-6 w-fit">
+                                            {/* Badge: Includes All Light Plan Features */}
+                                            <div className="flex gap-4 font-bold items-center whitespace-nowrap text-blue-800 bg-blue-50/50 px-5 py-3 rounded-2xl border border-blue-100 shadow-sm w-full justify-center">
+                                                <div className="w-8 h-8 flex items-center justify-center">
+                                                    <Star className="w-6 h-6 text-blue-500 fill-blue-50" />
+                                                </div>
+                                                <span className="text-base font-black">Light Planの全機能を含む</span>
+                                            </div>
+
+                                            {/* Instagram */}
+                                            <div className="flex gap-4 font-bold text-gray-900 items-center whitespace-nowrap">
+                                                <div className="w-10 h-10 bg-orange-100 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm">
+                                                    <Instagram className="w-5 h-5 text-orange-600" />
+                                                </div>
+                                                <div className="flex flex-col items-start">
+                                                    <span className="bg-gradient-to-r from-pink-500 to-rose-500 text-[10px] text-white px-3 rounded-full mb-1 font-black shadow-sm">ボタンを押すだけ</span>
+                                                    <span className="text-sm">Instagram連携半自動投稿システム</span>
+                                                </div>
+                                            </div>
+
+                                            {/* AI Image Generate */}
+                                            <div className="flex gap-4 font-bold text-gray-900 items-center whitespace-nowrap">
+                                                <div className="w-10 h-10 bg-indigo-100 rounded-full flex-shrink-0 flex items-center justify-center shadow-sm">
+                                                    <Sparkles className="w-5 h-5 text-indigo-600" />
+                                                </div>
+                                                <div className="text-sm">AI画像生成: <span className="text-2xl font-black text-indigo-600">60回</span>/月</div>
+                                            </div>
+
+                                            {/* Sales Analysis Badge (Shared) */}
+                                            <div className="flex gap-4 font-bold text-indigo-600 items-center whitespace-nowrap">
+                                                <div className="w-10 h-10 bg-indigo-50 rounded-full flex-shrink-0 flex items-center justify-center border border-indigo-100">
+                                                    <Sparkles className="w-4 h-4 text-indigo-500" />
+                                                </div>
+                                                <div className="text-sm">AI売上分析・経営帳簿 <span className="text-[10px] text-orange-500 font-bold ml-1">(開発予定)</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Premium Plan */}
-                    <div className="flex flex-col h-full group order-3 transition-all duration-300 md:hover:scale-105">
-                        <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 relative flex flex-col h-full overflow-hidden">
+                    <div className="flex flex-col group relative z-10 order-3 transform scale-105 transition-all duration-300">
+                        <div className="bg-white rounded-[24px] shadow-xl border-4 border-yellow-400 relative flex flex-col overflow-hidden">
 
                             {/* Header Label (In-flow) */}
-                            <div className="bg-gray-800 text-white text-center text-[10px] font-bold py-1 tracking-widest shadow-sm">
+                            <div className="bg-gradient-to-r from-yellow-600 to-amber-700 text-white text-center text-[10px] font-bold py-1 tracking-widest shadow-sm">
                                 💎 完全おまかせ / VIP
                             </div>
 
@@ -338,63 +358,32 @@ function PlansContent() {
                                 </div>
                             )}
 
-                            <div className="p-8 pb-10 flex flex-col h-full mt-2">
-                                <div className="h-[90px] mb-6">
-                                    <h3 className="text-2xl font-bold text-gray-800">Premium Plan</h3>
-                                    <p className="text-xs text-gray-500 font-medium leading-relaxed mt-1">
+                            <div className="p-8 pb-4 flex flex-col items-center text-center">
+                                <div className="mb-6 flex flex-col items-center">
+                                    <h3 className="text-3xl font-black text-gray-800 tracking-tight">Premium Plan</h3>
+                                    <p className="text-[13.5px] text-gray-500 font-medium leading-relaxed mt-2.5">
                                         AIによる究極の店舗経営を。<br />
                                         分析・作成・サポートのすべてがここに.
                                     </p>
                                 </div>
 
-                                <div className="mb-8 min-h-[65px]">
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-black text-gray-800">
-                                            ¥{billingCycle === 'year' ? '127,400' : '12,800'}
+                                <div className="mb-6 border-b border-gray-100 pb-4 flex flex-col items-center">
+                                    <div className="flex items-baseline justify-center gap-1">
+                                        <span className="text-6xl font-black text-gray-800 tracking-tighter drop-shadow-sm">
+                                            ¥{billingCycle === 'year' ? '147,000' : '14,800'}
                                         </span>
                                         <span className="text-gray-500 font-bold text-sm">/{billingCycle === 'year' ? '年' : '月'}</span>
                                     </div>
                                     {billingCycle === 'year' && (
-                                        <div className="mt-1 space-y-1">
-                                            <p className="text-[11px] text-red-600 font-extrabold flex items-center gap-1">
-                                                <Zap className="w-3 h-3" /> 年払いで ¥{(12800 * 12 - 127400).toLocaleString()} お得
-                                            </p>
-                                        </div>
+                                        <p className="text-[11px] text-red-600 font-extrabold mt-1 flex items-center justify-center gap-1">
+                                            <Zap className="w-3 h-3" /> 年払いで ¥{(14800 * 12 - 147000).toLocaleString()} お得
+                                        </p>
                                     )}
                                 </div>
 
-                                <div className="flex-grow px-8">
-                                    <ul className="space-y-4 text-sm text-gray-600 mb-8">
-                                        <li className="flex gap-3 text-gray-800 font-bold items-center bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                                            <Star className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                                            Standard Planの全機能
-                                        </li>
-                                        <li className="flex gap-3 font-bold items-center">
-                                            <Check className="w-4 h-4 text-gray-800" />
-                                            POP/メニューAI自動作成
-                                        </li>
-                                        <li className="flex gap-3 font-bold items-center">
-                                            <Sparkles className="w-4 h-4 text-indigo-600" />
-                                            AI画像生成: 90回/月
-                                        </li>
-                                        <li className="flex gap-3 font-bold items-center text-gray-800">
-                                            <Globe className="w-4 h-4" />
-                                            Webサイト維持管理費: ¥0 (込)
-                                        </li>
-                                        <li className="flex gap-3 font-bold items-center">
-                                            <Check className="w-4 h-4 text-gray-800" />
-                                            顧客分析AI
-                                        </li>
-                                        <li className="flex gap-3 font-bold items-center">
-                                            <Check className="w-4 h-4 text-gray-800" />
-                                            優先サポート
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                <div className="mt-auto p-8 pt-0 space-y-4">
+                                <div className="w-full mb-4">
                                     <Button
-                                        className="w-full bg-gray-800 hover:bg-gray-900 text-white shadow-lg transition-all border border-gray-700 font-bold h-12 rounded-xl"
+                                        className="w-full bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 hover:from-yellow-500 hover:via-amber-600 hover:to-yellow-700 text-white shadow-xl shadow-yellow-200 font-black h-16 rounded-2xl text-xl transform transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98]"
                                         onClick={() => handleCheckout(
                                             billingCycle === 'year' ? STRIPE_PLANS.BUSINESS_PREMIUM.yearly.id : STRIPE_PLANS.BUSINESS_PREMIUM.id,
                                             'Premium Plan'
@@ -403,6 +392,60 @@ function PlansContent() {
                                     >
                                         プレミアムで始める
                                     </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex-grow px-8 pb-10 flex flex-col items-center text-center">
+                                <div className="flex flex-col items-center w-full">
+                                    <div className="inline-flex flex-col items-start space-y-6 w-fit">
+                                        <div className="flex gap-4 font-bold items-center whitespace-nowrap text-amber-900 bg-amber-50/50 px-5 py-3 rounded-2xl border border-amber-200 shadow-sm w-full justify-center ring-2 ring-amber-50/50">
+                                            <div className="w-8 h-8 flex items-center justify-center">
+                                                <Star className="w-6 h-6 text-yellow-600 fill-yellow-200" />
+                                            </div>
+                                            <span className="text-base font-black">Light Plan/Standard Planの全機能</span>
+                                        </div>
+
+                                        <div className="flex gap-4 items-center whitespace-nowrap text-gray-800 font-bold">
+                                            <div className="w-10 h-10 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
+                                                <Check className="w-6 h-6 text-gray-800" />
+                                            </div>
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-xs text-orange-500 font-black">AI販促物生成</span>
+                                                <span className="text-sm">POP/メニューAI自動作成 <span className="text-[10px] text-orange-400 font-bold ml-1">(開発予定)</span></span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-4 items-center whitespace-nowrap text-indigo-600 font-black">
+                                            <div className="w-10 h-10 bg-indigo-100 rounded-full flex-shrink-0 flex items-center justify-center">
+                                                <Sparkles className="w-6 h-6 text-indigo-600" />
+                                            </div>
+                                            <div className="text-sm">AI画像生成: <span className="text-xl">90回</span>/月</div>
+                                        </div>
+
+                                        <div className="flex gap-4 items-center whitespace-nowrap text-blue-600 font-black">
+                                            <div className="w-10 h-10 bg-blue-100 rounded-full flex-shrink-0 flex items-center justify-center">
+                                                <Sparkles className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <div className="text-sm">AI売上分析・経営帳簿 <span className="text-[10px] text-orange-400 font-bold ml-1">(開発予定)</span></div>
+                                        </div>
+
+                                        <div className="flex gap-4 font-black items-center whitespace-nowrap text-orange-700 bg-orange-100 px-5 py-4 rounded-2xl border-2 border-orange-300 shadow-md w-full ring-4 ring-orange-50">
+                                            <div className="w-10 h-10 bg-orange-200 rounded-xl flex-shrink-0 flex items-center justify-center">
+                                                <Bot className="w-8 h-8 text-orange-700" />
+                                            </div>
+                                            <div className="flex flex-col items-start">
+                                                <span className="text-[11px] bg-orange-300 text-orange-900 px-2 rounded-full mb-1">将来機能</span>
+                                                <span className="text-base">ライバル店AI監視 (最大5店舗)</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-4 items-center whitespace-nowrap text-gray-700 font-bold">
+                                            <div className="w-10 h-10 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
+                                                <Check className="w-6 h-6 text-gray-800" />
+                                            </div>
+                                            <span className="text-sm">優先サポート</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -635,6 +678,6 @@ function PlansContent() {
                 </div>
             </div>
 
-        </div>
+        </div >
     );
 }

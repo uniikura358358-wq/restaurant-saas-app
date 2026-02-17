@@ -20,7 +20,17 @@ export async function verifyAuth(request: Request): Promise<AuthenticatedUser | 
 
     const idToken = authHeader.split("Bearer ")[1];
 
+    // 開発環境かつデモトークンの場合はバイパス
+    if (process.env.NODE_ENV === "development" && idToken === "demo-token") {
+        console.log("verifyAuth: Demo token detected, bypassing Firebase Admin Auth.");
+        return {
+            uid: "demo-user-id",
+            email: "demo@example.com",
+        };
+    }
+
     try {
+        console.log("verifyAuth: Verifying ID token with Firebase Admin...");
         const decodedToken = await adminAuth.verifyIdToken(idToken);
         return {
             uid: decodedToken.uid,

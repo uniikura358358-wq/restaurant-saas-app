@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Loader2, Sparkles, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button'; // プロジェクトのUIコンポーネントを使用
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ReviewReplyButtonProps {
     reviewText: string;
@@ -22,6 +23,7 @@ export default function ReviewReplyButton({
 }: ReviewReplyButtonProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { getToken } = useAuth();
 
     const handleGenerate = async () => {
         // 1. 防御的プログラミング: 連打防止と空入力チェック
@@ -62,14 +64,18 @@ export default function ReviewReplyButton({
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 45000); // 45秒 (Server Max 40s + Buffer)
 
+            const token = await getToken();
+            if (!token) throw new Error("認証トークンが取得できませんでした。再ログインしてください。");
+
             const response = await fetch('/api/generate-reply', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     reviewText,
-                    starRating: rating, // APIの期待するキー名に修正 (rating -> starRating)
+                    starRating: rating,
                     customerName,
                     config: {
                         store_name: "マイ店舗", // デフォルト

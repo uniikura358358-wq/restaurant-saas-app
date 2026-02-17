@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGenerativeModel } from "@/lib/vertex-ai";
 import { NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
 
@@ -20,13 +20,12 @@ async function getActiveModelName() {
     try {
         const doc = await adminDb.collection("system_config").doc("active_ai_model").get();
         if (!doc.exists) {
-            console.warn("DBからの取得に失敗しました。デフォルト(2.5-flash-lite)を使用します。");
-            return DEFAULT_FALLBACK_MODEL;
+            return "gemini-1.5-flash";
         }
-        return doc.data()?.value || DEFAULT_FALLBACK_MODEL;
-    } catch {
-        console.warn("DBからの取得に失敗しました。デフォルト(2.5-flash-lite)を使用します。");
-        return DEFAULT_FALLBACK_MODEL;
+        return doc.data()?.value || "gemini-1.5-flash";
+    } catch (error) {
+        console.warn("DB fetch failed for model name (using default):", error);
+        return "gemini-1.5-flash";
     }
 }
 
@@ -51,10 +50,8 @@ function extractJsonObject(text: string) {
 
 export async function POST(request: Request) {
     try {
+        // Vertex AI ではサービスアカウント認証のため必須ではない
         const apiKey = process.env.GOOGLE_API_KEY?.trim();
-        if (!apiKey) {
-            return NextResponse.json({ error: "GOOGLE_API_KEY が未設定です" }, { status: 500 });
-        }
 
         // ユーザー認証チェック
         const authHeader = request.headers.get("Authorization");
@@ -71,9 +68,14 @@ export async function POST(request: Request) {
         const uid = decodedToken.uid;
 
         // プラン権限チェック (バックエンド側の防衛線)
-        const userDoc = await adminDb.collection("users").doc(uid).get();
-        const userData = userDoc.data();
-        const userPlan = (userData?.plan || 'Free').toLowerCase();
+        let userPlan = "standard"; // デフォルトで解析を許可するプランに設定
+        try {
+            const userDoc = await adminDb.collection("users").doc(uid).get();
+            const userData = userDoc.data();
+            userPlan = (userData?.plan || userData?.planName || 'Standard').toLowerCase();
+        } catch (dbError) {
+            console.error("Analyze API: Plan fetch failed (Falling back to standard):", dbError);
+        }
 
         if (!ALLOWED_PLANS.includes(userPlan)) {
             return NextResponse.json({ error: "現在のプランではこの機能を利用できません。アップグレードをご検討ください。" }, { status: 403 });
@@ -101,8 +103,7 @@ export async function POST(request: Request) {
         const base64 = Buffer.from(arrayBuffer).toString("base64");
 
         const modelName = await getActiveModelName();
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const model = getGenerativeModel(modelName);
 
         const prompt =
             "この料理の画像を分析し、Instagram投稿のキャプション生成に役立つ情報を抽出してください。以下のJSON形式でのみ出力すること。\n" +
@@ -118,21 +119,29 @@ export async function POST(request: Request) {
 
         try {
             const result = await Promise.race([
-                model.generateContent([
-                    { text: prompt },
-                    {
-                        inlineData: {
-                            data: base64,
-                            mimeType,
+                model.generateContent({
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inlineData: {
+                                        data: base64,
+                                        mimeType,
+                                    },
+                                },
+                            ],
                         },
-                    },
-                ]),
+                    ],
+                }),
                 new Promise<never>((_, reject) =>
                     setTimeout(() => reject(new Error("TIMEOUT")), ANALYZE_TIMEOUT_MS)
                 ),
             ]);
 
-            const text = (result as { response: { text: () => string } }).response.text();
+            const response = (result as any).response;
+            const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
             const parsed = extractJsonObject(text);
 
             if (!parsed || typeof parsed !== "object") {

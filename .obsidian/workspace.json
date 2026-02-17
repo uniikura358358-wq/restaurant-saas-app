@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "97_タグ一覧表/Folder_Structure.md.md",
+                "file": "10_進行中プロジェクト/01_Google口コミ自動化/07_Operation_Guide.md.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Folder_Structure.md"
+              "title": "07_Operation_Guide.md"
             }
           }
         ]
@@ -181,20 +181,44 @@
       "templater-obsidian:Templater": false
     }
   },
-  "active": "664875814966e4e3",
+  "active": "dcb57bd63b80d9e1",
   "lastOpenFiles": [
-    "10_進行中プロジェクト/command.txt",
-    "CLAUDE.md.md",
-    "CLAUDE.md",
-    "97_タグ一覧表/Custom_Dictionary.md",
-    "97_タグ一覧表/Folder_Structure.md.md",
-    "00_経営・戦略/Dashboard.md",
-    "97_タグ一覧表/Tag_Definitions.md.md",
-    "Templates/Idea_Template.md",
-    "97_タグ一覧表",
-    "98_アーカイブ/Daily_Note_Template.md",
-    "Templates/Spec_Template.md",
-    "無題のファイル.canvas",
-    "無題のファイル.base"
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/runtime/getUrl.js.map",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/runtime/getUrl.js",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/runtime/api.js.map",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/runtime/api.js",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/postcss-url-parser.js.map",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/postcss-url-parser.js",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/postcss-import-parser.js.map",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/postcss-import-parser.js",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/postcss-icss-parser.js.map",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/postcss-icss-parser.js",
+    "restaurant-saas-app/node_modules/next/dist/esm/build/webpack/loaders/css-loader/src/plugins/index.js.map",
+    "restaurant-saas-app/node_modules/next/dist/compiled/@babel/runtime/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/@isaacs/cliui/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/@isaacs/cliui/LICENSE.md",
+    "restaurant-saas-app/node_modules/@radix-ui/react-label/node_modules/@radix-ui/react-slot/README.md",
+    "restaurant-saas-app/node_modules/@radix-ui/react-label/node_modules/@radix-ui/react-primitive/README.md",
+    "restaurant-saas-app/node_modules/@radix-ui/react-form/node_modules/@radix-ui/react-label/README.md",
+    "restaurant-saas-app/node_modules/radix-ui/node_modules/@radix-ui/react-label/README.md",
+    "restaurant-saas-app/node_modules/next/dist/compiled/regenerator-runtime/README.md",
+    "restaurant-saas-app/node_modules/next/dist/compiled/react-refresh/README.md",
+    "restaurant-saas-app/node_modules/next/dist/compiled/react-is/README.md",
+    "restaurant-saas-app/node_modules/@typescript-eslint/typescript-estree/node_modules/semver/README.md",
+    "restaurant-saas-app/node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch/README.md",
+    "restaurant-saas-app/node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion/README.md",
+    "restaurant-saas-app/node_modules/@typescript-eslint/eslint-plugin/node_modules/ignore/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/minimatch/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/minimatch/LICENSE.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/jackspeak/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/jackspeak/LICENSE.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/glob-parent/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/glob-parent/CHANGELOG.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/fast-glob/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/brace-expansion/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/balanced-match/README.md",
+    "restaurant-saas-app/node_modules/@ts-morph/common/node_modules/balanced-match/LICENSE.md",
+    "restaurant-saas-app/node_modules/@modelcontextprotocol/sdk/node_modules/json-schema-traverse/README.md",
+    "無題のファイル.canvas"
   ]
 }

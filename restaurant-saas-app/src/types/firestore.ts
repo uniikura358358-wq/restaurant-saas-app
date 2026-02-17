@@ -14,7 +14,14 @@ export interface DashboardStats {
     unrepliedCount: number;
     repliedCount: number;
     averageRating: number;
-    lowRatingCount: number; // 星1-2の数（優先対応用）
+    lowRatingCount: number; // 星1-2の数
+    aiUsage?: {
+        sent: number;
+        limit: number;
+        remaining: number;
+    };
+    planName?: string;
+    storeName?: string;
     updatedAt: Timestamp | Date;
 }
 
@@ -123,7 +130,10 @@ export interface StoreData {
     notificationConfig?: NotificationConfig;
     smsLimitOverride?: number;
     aiTone?: "polite" | "friendly" | "energetic";
-    // ... other settings fields mapped from legacy ...
+
+    // Google Business Profile 連携用
+    gbpAccountId?: string;  // accounts/ACCOUNT_ID
+    gbpLocationId?: string; // locations/LOCATION_ID
 
     updatedAt: Timestamp | Date;
 }

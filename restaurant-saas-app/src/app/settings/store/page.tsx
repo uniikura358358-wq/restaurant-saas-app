@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { usePlanGuard } from "@/hooks/usePlanGuard";
 // createClient import removed
 import { toast } from "sonner";
@@ -119,6 +120,7 @@ function StoreSettingsContent() {
     const [config, setConfig] = useState<ToneConfigData>(DEFAULT_CONFIG);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const { user, getToken } = useAuth();
     const { hasFeature, loading: planLoading, refreshPlan } = usePlanGuard();
     const router = useRouter();
 
@@ -133,12 +135,28 @@ function StoreSettingsContent() {
     const [aiTestLoading, setAiTestLoading] = useState(false);
     const [aiTestReply, setAiTestReply] = useState("");
 
+    // --- Instagram States ---
+    const [instaFile, setInstaFile] = useState<File | null>(null);
+    const [instaAnalysis, setInstaAnalysis] = useState<any>(null);
+    const [instaCaption, setInstaCaption] = useState("");
+    const [instaAnalyzing, setInstaAnalyzing] = useState(false);
+    const [instaPosting, setInstaPosting] = useState(false);
+    const [instaPreviewUrl, setInstaPreviewUrl] = useState<string | null>(null);
+
     // activeModelName related code removed
 
     // 設定を取得
     const fetchConfig = useCallback(async () => {
         try {
-            const response = await fetch("/api/settings/get", { cache: "no-store" });
+            const token = await getToken();
+            if (!token) return; // Wait for token
+
+            const response = await fetch("/api/settings/get", {
+                cache: "no-store",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
             if (!response.ok) throw new Error("設定の取得に失敗しました");
             const data = await response.json();
 
@@ -171,9 +189,15 @@ function StoreSettingsContent() {
 
         try {
             setSaving(true);
+            const token = await getToken();
+            if (!token) throw new Error("認証が必要です");
+
             const response = await fetch("/api/settings/save", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify(config),
             });
 
@@ -202,9 +226,15 @@ function StoreSettingsContent() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 45000); // 45秒 (Server Max 40s + Buffer)
 
+            const token = await getToken();
+            if (!token) throw new Error("認証が必要です");
+
             const res = await fetch("/api/generate-reply", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     reviewText: aiTestReviewText,
                     starRating: aiTestStarRating,
@@ -261,6 +291,83 @@ function StoreSettingsContent() {
             textarea.focus();
             textarea.setSelectionRange(start + tag.length, start + tag.length);
         }, 10);
+    };
+
+    const handleInstagramAnalyze = async () => {
+        if (!instaFile) {
+            toast.warning("画像を選択してください");
+            return;
+        }
+
+        try {
+            setInstaAnalyzing(true);
+
+            const formData = new FormData();
+            formData.append("image", instaFile);
+
+            const token = await getToken();
+            if (!token) throw new Error("認証に失敗しました。再ログインしてください。");
+
+            const res = await fetch("/api/instagram/analyze", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                },
+                body: formData,
+            });
+
+            if (!res.ok) throw new Error("画像解析に失敗しました");
+            const data = await res.json();
+            setInstaAnalysis(data.result);
+
+            // キャプション案の初期値セット
+            setInstaCaption(`${data.result.dish_name}\n\n${data.result.visual_features}\n\n#${data.result.dish_name} #グルメ`);
+            toast.success("画像を解析しました");
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setInstaAnalyzing(false);
+        }
+    };
+
+    const handleInstagramPost = async () => {
+        if (!instaCaption.trim()) {
+            toast.warning("キャプションを入力してください");
+            return;
+        }
+
+        try {
+            setInstaPosting(true);
+            const token = await getToken();
+            if (!token) throw new Error("認証が必要です");
+
+            const response = await fetch("/api/instagram/post", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    imageUrl: "https://images.unsplash.com/photo-1552566626-52f8b828add9", // 実機検証用の仮URL
+                    caption: instaCaption
+                }),
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || "投稿に失敗しました");
+            }
+
+            toast.success("Instagram に投稿しました！");
+            setInstaAnalysis(null);
+            setInstaCaption("");
+            setInstaFile(null);
+            setInstaPreviewUrl(null);
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setInstaPosting(false);
+        }
     };
 
     // handleInstagramPost removed as it was unused and caused lint errors
@@ -557,21 +664,74 @@ function StoreSettingsContent() {
                                                         </div>
                                                     )}
 
-                                                    <CardContent className="space-y-8 relative">
-                                                        <div className="space-y-3 opacity-50 pointer-events-none select-none filter blur-[1px]">
-                                                            <Label htmlFor="insta_text">Instagram投稿</Label>
-                                                            <Textarea
-                                                                id="insta_text"
-                                                                placeholder="投稿用テキスト"
-                                                                className="min-h-[120px]"
-                                                                disabled
-                                                            />
-                                                            <Button
-                                                                className="w-full bg-gradient-to-r from-purple-500 to-orange-500 text-white font-bold"
-                                                                disabled
+                                                    <CardContent className="space-y-6 pt-4">
+                                                        <div className="space-y-4">
+                                                            <div className="group flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-2xl p-8 hover:bg-muted/30 transition-all cursor-pointer relative overflow-hidden"
+                                                                onClick={() => document.getElementById('insta-upload')?.click()}
                                                             >
-                                                                <Instagram className="size-4 mr-2" /> Instagramを開く
+                                                                {instaPreviewUrl ? (
+                                                                    <div className="relative">
+                                                                        <img src={instaPreviewUrl} alt="Preview" className="max-h-64 rounded-xl shadow-lg transition-transform group-hover:scale-[1.02]" />
+                                                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                                                                            <RefreshCcw className="size-8 text-white animate-pulse" />
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex flex-col items-center gap-2 text-muted-foreground animate-in fade-in zoom-in duration-300">
+                                                                        <div className="p-4 bg-muted rounded-full mb-2 group-hover:bg-primary/10 transition-colors">
+                                                                            <Instagram className="size-10 group-hover:text-primary transition-colors" />
+                                                                        </div>
+                                                                        <p className="text-sm font-bold">クリックして画像を選択</p>
+                                                                        <p className="text-[10px] opacity-70">JPG, PNG (最大5MB)</p>
+                                                                    </div>
+                                                                )}
+                                                                <input
+                                                                    id="insta-upload"
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    className="hidden"
+                                                                    onChange={(e) => {
+                                                                        const file = e.target.files?.[0];
+                                                                        if (file) {
+                                                                            setInstaFile(file);
+                                                                            setInstaPreviewUrl(URL.createObjectURL(file));
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+
+                                                            <Button
+                                                                className="w-full h-11 bg-primary shadow-md hover:shadow-lg transition-all"
+                                                                onClick={handleInstagramAnalyze}
+                                                                disabled={!instaFile || instaAnalyzing}
+                                                            >
+                                                                {instaAnalyzing ? <Loader2 className="size-4 animate-spin mr-2" /> : <Sparkles className="size-4 mr-2" />}
+                                                                {instaAnalyzing ? "解析中..." : "AIで解析・キャプション作成"}
                                                             </Button>
+
+                                                            {instaAnalysis && (
+                                                                <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                                                                    <div className="space-y-2">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <Label className="text-xs font-bold text-muted-foreground">キャプション案</Label>
+                                                                            <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">AI生成済</span>
+                                                                        </div>
+                                                                        <Textarea
+                                                                            value={instaCaption}
+                                                                            onChange={(e) => setInstaCaption(e.target.value)}
+                                                                            className="min-h-[160px] text-sm leading-relaxed focus:ring-primary/20"
+                                                                        />
+                                                                    </div>
+                                                                    <Button
+                                                                        className="w-full bg-gradient-to-r from-purple-500 to-orange-500 text-white font-bold h-12 rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
+                                                                        onClick={handleInstagramPost}
+                                                                        disabled={instaPosting}
+                                                                    >
+                                                                        {instaPosting ? <Loader2 className="size-4 animate-spin mr-2" /> : <Instagram className="size-4 mr-2" />}
+                                                                        {instaPosting ? "投稿中..." : "Instagram に今すぐ投稿"}
+                                                                    </Button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </CardContent>
                                                 </div>

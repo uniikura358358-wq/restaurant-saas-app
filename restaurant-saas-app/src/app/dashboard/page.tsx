@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ToastContainer, useToast } from "@/components/ui/toast-custom";
 import { AppSidebar } from "@/components/app-sidebar";
 import ReviewReplyButton from "@/components/review-reply-button";
-import { getDashboardStats, getReviews } from "@/app/actions/dashboard";
+import { getDashboardStats, getReviews, submitReply } from "@/app/actions/dashboard";
 import { DashboardStats, FirestoreReview } from "@/types/firestore";
 
 export default function DashboardPage() {
@@ -30,6 +30,8 @@ export default function DashboardPage() {
   // Reply Input State
   const [replies, setReplies] = useState<{ [key: string]: string }>({});
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [hiddenReviewIds, setHiddenReviewIds] = useState<Set<string>>(new Set());
 
   const { toasts, addToast } = useToast();
 
@@ -91,6 +93,9 @@ export default function DashboardPage() {
   // ─── 保存機能 (Server API) ───
   const handleSaveReply = async (reviewId: string, content: string) => {
     if (!content.trim()) return;
+
+    // 【楽観的更新】即座にリストから隠す
+    setHiddenReviewIds(prev => new Set(prev).add(reviewId));
     setSubmittingId(reviewId);
 
     try {
@@ -100,33 +105,68 @@ export default function DashboardPage() {
         return;
       }
 
-      // Phase 3で実装する Transaction API をコール
-      const response = await fetch("/api/reviews/submit-reply", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ reviewId, replyContent: content }),
-      });
+      // Server Action を使用して保存
+      const result = await submitReply(token, reviewId, content);
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || "保存に失敗しました");
+      if (!result.success) {
+        throw new Error("保存に失敗しました");
       }
 
-      addToast("返信を保存しました！");
-      // リロードして最新化（またはOptimistic Update）
+      addToast("返信を送信しました");
+      // 入力状態のリセット
+      setReplies(prev => {
+        const next = { ...prev };
+        delete next[reviewId];
+        return next;
+      });
+
+      // サーバー状態と同期
+      router.refresh();
       await fetchData();
 
     } catch (err: any) {
       console.error(err);
       addToast(err.message || "保存できませんでした", "error");
+      // エラー時は非表示を解除
+      setHiddenReviewIds(prev => {
+        const next = new Set(prev);
+        next.delete(reviewId);
+        return next;
+      });
     } finally {
       setSubmittingId(null);
     }
   };
 
+  const handleSyncReviews = async () => {
+    setSyncing(true);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("認証トークンが取得できませんでした");
+
+      const response = await fetch("/api/reviews/sync", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "同期に失敗しました");
+      }
+
+      const data = await response.json();
+      addToast(data.message || "同期が完了しました");
+      // 同期後にデータを再フェッチ
+      await fetchData();
+    } catch (err: any) {
+      console.error(err);
+      addToast(err.message || "同期中または設定に問題があります", "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // ─── Utility ───
   const copyToClipboard = async (text: string) => {
@@ -149,48 +189,87 @@ export default function DashboardPage() {
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <h1 className="text-3xl font-bold">ダッシュボード</h1>
-                <p className="text-sm text-muted-foreground">
-                  店舗: {stats ? "データ連携済み (Firebase)" : "読み込み中..."}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground font-medium">
+                    店舗: {stats?.storeName || (loading ? "読み込み中..." : "未設定")}
+                  </p>
+                  {stats?.planName && (
+                    <Badge variant="secondary" className="text-[10px] font-bold bg-primary/10 text-primary border-none">
+                      {stats.planName}
+                    </Badge>
+                  )}
+                </div>
               </div>
-              <div className="flex p-1 bg-muted rounded-xl w-fit">
-                <button
-                  onClick={() => setActiveTab("pending")}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${activeTab === "pending"
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSyncReviews}
+                  disabled={syncing || loading}
+                  className="bg-background shadow-sm h-9"
                 >
-                  未返信
-                </button>
-                <button
-                  onClick={() => setActiveTab("replied")}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${activeTab === "replied"
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                    }`}
-                >
-                  返信済み
-                </button>
+                  {syncing ? <Loader2 className="size-4 animate-spin mr-2" /> : <RotateCcw className="size-4 mr-2" />}
+                  口コミを同期
+                </Button>
+
+                <div className="flex p-1 bg-muted rounded-xl w-fit">
+                  <button
+                    onClick={() => setActiveTab("pending")}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${activeTab === "pending"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    未返信
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("replied")}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${activeTab === "replied"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    返信済み
+                  </button>
+                </div>
               </div>
             </header>
 
             {/* KPI Dashboard (Stats from Firestore) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="bg-card p-5 rounded-xl shadow-sm border">
-                <div className="text-muted-foreground text-sm font-bold mb-1">総口コミ数</div>
-                <div className="text-3xl font-bold">{stats?.totalReviews ?? "-"} <span className="text-sm font-normal">件</span></div>
-                <div className="text-xs text-muted-foreground mt-2">連携中</div>
+                <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">総口コミ数</div>
+                <div className="text-3xl font-black">{stats?.totalReviews ?? "-"} <span className="text-xs font-medium opacity-50">件</span></div>
+                <div className="text-[10px] text-muted-foreground mt-2 flex items-center gap-1">
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> 同期済み
+                </div>
               </div>
               <div className="bg-card p-5 rounded-xl shadow-sm border">
-                <div className="text-muted-foreground text-sm font-bold mb-1">平均スコア</div>
-                <div className="text-3xl font-bold">{stats?.averageRating?.toFixed(1) ?? "-"} <span className="text-lg text-yellow-500">★</span></div>
-                <div className="text-xs text-muted-foreground mt-2">星1-2: {stats?.lowRatingCount ?? 0}件</div>
+                <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">平均スコア</div>
+                <div className="text-3xl font-black">{stats?.averageRating?.toFixed(1) ?? "-"} <span className="text-lg text-yellow-500">★</span></div>
+                <div className="text-[10px] text-muted-foreground mt-2 font-bold text-destructive/80">
+                  星1-2: {stats?.lowRatingCount ?? 0}件 (要警戒)
+                </div>
+              </div>
+              <div className="bg-card p-5 rounded-xl shadow-sm border ring-2 ring-primary/20">
+                <div className="text-primary text-[10px] font-black uppercase tracking-widest mb-1">未返信 (対応中)</div>
+                <div className="text-3xl font-black text-primary">{stats?.unrepliedCount ?? "-"} <span className="text-xs font-medium opacity-50">件</span></div>
+                <div className="text-[10px] text-primary/70 mt-2 font-bold">
+                  至急対応が必要です
+                </div>
               </div>
               <div className="bg-card p-5 rounded-xl shadow-sm border">
-                <div className="text-muted-foreground text-sm font-bold mb-1">未返信</div>
-                <div className="text-3xl font-bold text-destructive">{stats?.unrepliedCount ?? "-"} <span className="text-sm font-normal">件</span></div>
-                <div className="text-xs text-muted-foreground mt-2">対応が必要です</div>
+                <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">AI 生成枠 (今月)</div>
+                <div className="text-3xl font-black">
+                  {stats?.aiUsage ? `${stats.aiUsage.remaining}` : "-"}
+                  <span className="text-xs font-medium opacity-50"> / {stats?.aiUsage?.limit ?? "-"}</span>
+                </div>
+                <div className="w-full bg-muted h-1 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-primary h-full transition-all duration-1000"
+                    style={{ width: `${stats?.aiUsage ? (stats.aiUsage.sent / stats.aiUsage.limit) * 100 : 0}%` }}
+                  />
+                </div>
               </div>
             </div>
 
@@ -200,9 +279,25 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium">データを読み込み中...</p>
               </div>
             ) : error ? (
-              <div className="p-4 border border-destructive/20 bg-destructive/5 rounded-xl text-destructive text-sm flex items-center gap-3">
-                <XCircle className="size-4 shrink-0" />
-                <span>エラーが発生しました: {error}</span>
+              <div className="flex flex-col gap-4">
+                <div className="p-4 border border-destructive/20 bg-destructive/5 rounded-xl text-destructive text-sm flex items-center gap-3">
+                  <XCircle className="size-4 shrink-0" />
+                  <span>エラーが発生しました: {error}</span>
+                </div>
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    className="text-gray-500 border-gray-200 hover:bg-gray-100"
+                    onClick={() => {
+                      localStorage.removeItem("demo_user");
+                      localStorage.removeItem("simulatedPlan");
+                      router.push("/login");
+                      window.location.reload();
+                    }}
+                  >
+                    Clear Session & Login
+                  </Button>
+                </div>
               </div>
             ) : reviews.length === 0 ? (
               <div className="text-center py-32 bg-background rounded-2xl border border-dashed flex flex-col items-center gap-2">
@@ -218,7 +313,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6">
-                {reviews.map((review) => (
+                {reviews.filter(r => !hiddenReviewIds.has(r.id)).map((review) => (
                   <Card key={review.id} className={`shadow-sm hover:shadow-md transition-shadow overflow-hidden ${activeTab === "replied"
                     ? "border-l-4 border-l-emerald-500 border-t-0 border-r-0 border-b-0 ring-1 ring-emerald-200/50"
                     : "border-none ring-1 ring-black/5"
@@ -327,7 +422,7 @@ export default function DashboardPage() {
                           className="bg-indigo-600 hover:bg-indigo-700 text-white"
                         >
                           {submittingId === review.id ? <Loader2 className="animate-spin size-4 mr-2" /> : null}
-                          {submittingId === review.id ? "保存中..." : "返信を保存して完了"}
+                          {submittingId === review.id ? "送信中..." : "Googleに返信を送信"}
                         </Button>
                       </div>
                     )}

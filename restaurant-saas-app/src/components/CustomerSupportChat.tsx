@@ -268,7 +268,7 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     faq_standard: {
         id: 'faq_standard',
-        botMessage: '【Standardプラン (月額9,800円)】\n\nLightプランに加え、Instagram集客を強化する人気プランです。\n\n**追加機能:**\n- **インスタ半自動投稿**: 面倒な投稿作業をボタン一つで完了\n- **リピーター獲得**: SNS発信を継続し、ファンを育てます\n\n「新規客」と「リピーター」の両方を獲得したい方におすすめです！',
+        botMessage: '【Standardプラン (月額9,800円)】\n\nLightプランに加え、Instagram集客を強化する人気プランです。\n\n**追加機能:**\n- **Instagram連携半自動投稿システム**: 面倒な投稿作業をボタン一つで完了\n- **リピーター獲得**: SNS発信を継続し、ファンを育てます\n\n「新規客」と「リピーター」の両方を獲得したい方におすすめです！',
         options: [
             { label: '他のプランも見る', nextStep: 'faq_plans_select' },
             { label: '契約について聞きたい', nextStep: 'faq_contract' },

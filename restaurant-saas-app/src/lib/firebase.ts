@@ -1,7 +1,14 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import {
+    getFirestore,
+    Firestore,
+    initializeFirestore,
+    memoryLocalCache,
+    disableNetwork
+} from "firebase/firestore";
+import { getAuth, Auth } from "firebase/auth";
 
+// 環境変数の取得
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -11,14 +18,42 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: any;
-let auth: any;
-let db: any;
+// シングルトンインスタンスの保持
+let app: FirebaseApp;
+let db: Firestore;
+let auth: Auth;
+
+// Demoモード判定
+const isDemoMode =
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === "demo-project" ||
+    process.env.NEXT_PUBLIC_IS_DEMO === "true";
 
 try {
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    if (!getApps().length) {
+        app = initializeApp(firebaseConfig);
+
+        // 【修正点】Firestore初期化設定
+        // 永続化キャッシュ（IndexedDB）によるエラーを回避するため、メモリキャッシュを強制
+        db = initializeFirestore(app, {
+            localCache: memoryLocalCache()
+        });
+
+        // 【修正点】Demoモード時のネットワーク遮断
+        // ダミーProjectIDへの接続試行による "Client is offline" エラーを根絶する
+        if (isDemoMode && typeof window !== 'undefined') {
+            disableNetwork(db).catch((e) => {
+                console.warn("Demo Mode: Network disable failed", e);
+            });
+        }
+    } else {
+        app = getApp();
+        db = getFirestore(app);
+        // 既存インスタンス取得時もDemoモードなら念のため切断を試行
+        if (isDemoMode && typeof window !== 'undefined') {
+            disableNetwork(db).catch(() => { });
+        }
+    }
     auth = getAuth(app);
-    db = getFirestore(app);
 } catch (error) {
     console.error("Firebase initialization failed:", error);
 }

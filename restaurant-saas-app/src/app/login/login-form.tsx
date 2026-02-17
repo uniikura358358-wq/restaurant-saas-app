@@ -86,7 +86,7 @@ function LoginFormContent() {
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="password" university-font-medium className="text-gray-700 font-medium ml-1">パスワード</Label>
+                    <Label htmlFor="password" className="text-gray-700 font-medium ml-1">パスワード</Label>
                     <Input
                         id="password"
                         type="password"
@@ -161,21 +161,81 @@ function LoginFormContent() {
                         Whop
                     </Button>
                 </div>
+
             </form>
 
             <div className="text-center pt-4">
-                <button
-                    type="button"
-                    onClick={() => {
-                        setIsLogin(!isLogin)
-                        setMessage(null)
-                    }}
-                    className="text-sm text-gray-500 hover:text-indigo-600 transition-colors font-medium"
-                    disabled={loading}
-                >
-                    {isLogin ? 'アカウントをお持ちでない方（新規作成）' : '既にアカウントをお持ちの方（ログイン）'}
-                </button>
+                <p className="text-sm text-gray-500">
+                    アカウントをお持ちでない方は{' '}
+                    <button
+                        onClick={() => {
+                            setIsLogin(!isLogin)
+                            setMessage(null)
+                        }}
+                        className="text-indigo-600 font-bold hover:underline"
+                        disabled={loading}
+                    >
+                        {isLogin ? '新規登録' : 'ログイン'}
+                    </button>
+                </p>
+                <div className="mt-4">
+                    <button
+                        onClick={() => router.push('/plans')}
+                        className="text-xs text-gray-400 hover:text-indigo-500 underline transition-colors"
+                    >
+                        料金プランを確認する
+                    </button>
+                </div>
             </div>
+
+            {/* 開発環境用：管理者デモパネル (画面下中央に固定) */}
+            {process.env.NODE_ENV === "development" && (
+                <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[99999] w-auto">
+                    <div className="bg-white/95 backdrop-blur-xl p-5 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-orange-200 flex flex-col items-center gap-4 min-w-[340px] border-b-4 border-b-orange-500">
+                        <div className="flex flex-col items-center gap-1">
+                            <span className="text-[11px] font-black text-white bg-gradient-to-r from-orange-500 to-red-600 px-4 py-1 rounded-full uppercase tracking-widest shadow-md">
+                                ADMIN DEBUG PANEL
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-bold">開発環境（localhost）専用</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 w-full">
+                            {[
+                                { id: 'Light', label: 'ライト', color: 'bg-blue-50 text-blue-700 border-blue-100' },
+                                { id: 'Standard', label: '標準', color: 'bg-orange-50 text-orange-700 border-orange-100' },
+                                { id: 'Premium', label: 'プレミアム', color: 'bg-indigo-50 text-indigo-700 border-indigo-100' }
+                            ].map((p) => (
+                                <Button
+                                    key={p.id}
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className={`h-12 rounded-xl border-2 font-black transition-all hover:scale-105 active:scale-95 ${p.color}`}
+                                    onClick={() => {
+                                        localStorage.setItem("demo_user", "true");
+                                        localStorage.setItem("simulatedPlan", p.id);
+                                        toast.success(`${p.label}プランとしてログインしました`);
+                                        window.location.href = "/dashboard";
+                                    }}
+                                >
+                                    {p.label}
+                                </Button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => {
+                                localStorage.removeItem("demo_user");
+                                localStorage.removeItem("simulatedPlan");
+                                toast.info("デモ設定をリセットしました");
+                                window.location.reload();
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-red-500 transition-colors font-bold border-t border-gray-100 w-full pt-3 mt-1 flex items-center justify-center gap-1"
+                        >
+                            <Loader2 className="w-3 h-3" />
+                            すべてのシミュレーションをリセット
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

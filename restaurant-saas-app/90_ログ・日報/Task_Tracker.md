@@ -1,5 +1,22 @@
 # Firebase Unification Tasks (Final Plan)
 
+- [x] 動作確認・検証
+  - [x] 認証エラーの有無確認 (ビルド通過・静的解析)
+  - [x] 応答生成の確認 (コード整合性確認)
+  - [x] UI連携時の認証エラー修正
+  - [x] 重複コンポーネント (PascalCaseファイル) の削除
+- [x] 日報・ダッシュボード更新
+  - [x] `Dashboard.md` の更新
+  - [x] 日報の作成
+- [x] 依存関係のセットアップ
+  - [x] `@google-cloud/vertexai` のインストール 初期化エラー抑制
+  - [x] 管理者コンソールの操作性改善 (ドラッグ、Premium対応、タイポ修正)
+- [x] Instagram連携のラベリング・配置修正、およびStandardプランUIの磨き込み (完了)
+  - [x] `lib/instagram-client.ts` の実装
+  - [x] `api/instagram/post` エンドポイントの実装
+  - [x] UI 側への「Instagram 投稿」ボタン追加とプラン制限の構築
+  - [x] 実機投稿テストとエラーハンドリング調整
+
 - [x] **Phase 0: Safety & Inventory** `[x]`
   - [x] 環境変数チェック (`src/lib/check-env.ts`)
   - [x] データ台帳 (`Data_Inventory.md`)
@@ -11,6 +28,11 @@
   - [x] **Stats Design**: `tenants/{id}/stats` スキーマ定義
   - [x] **Dashboard Updates**: `DashboardStats` を用いた集計表示への移行
   - [x] `src/app/dashboard/page.tsx` を Firestore Admin SDK 読み取りに変更
+- [x] **Phase 5: AI Cost Control & Governance** `[x]`
+  - [x] **Cost Tracking**: `ai-quota.ts` を「回数」から「予算（円）＋回数」の二重管理に移行
+  - [x] **Safety Guard**: `ESTIMATED_COST_PER_TEXT_CALL_YEN` によるリアルタイム予算減算の実装
+  - [x] **Isolation**: 画像生成（高コスト）とテキスト生成（低コスト）のクォータ物理分離
+  - [x] **永続化**: `.cursorrules` & `AI_MODEL_STANDARDS.md` への機密ルール追記
 - [x] **Phase 3: API Reliability** `[x]`
   - [x] **Idempotency**: `requests/{requestId}` コレクションと `X-Request-ID` によるチェック実装
   - [x] **Transaction**: `submit-reply` APIに「Stats更新 + 冪等性チェック」を完全実装

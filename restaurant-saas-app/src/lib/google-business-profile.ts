@@ -10,13 +10,14 @@ const SCOPES = [
     'https://www.googleapis.com/auth/business.manage',
 ];
 
+import { FirestoreReview } from '@/types/firestore';
+
 /**
  * Google Business Profile API クライアントを初期化する
  */
 export async function getGoogleBusinessProfileClient() {
     if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
-        console.warn("Google Credentials not set. API calls will fail.");
-        return null;
+        throw new Error("Google Credentials not set. Check environment variables.");
     }
 
     const auth = new JWT({
@@ -38,8 +39,7 @@ export async function getGoogleBusinessProfileClient() {
  */
 export async function getGoogleReviewsClient() {
     if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
-        console.warn("Google Credentials not set. API calls will fail.");
-        return null;
+        throw new Error("Google Credentials not set. Check environment variables.");
     }
 
     const auth = new JWT({
@@ -59,6 +59,38 @@ export async function getGoogleReviewsClient() {
         version: 'v1',
         auth
     });
+}
+
+/**
+ * Google API のレビューデータを FirestoreReview 型にマッピングする
+ * @param review Google API response review object
+ * @param userId Firebase UID
+ * @param storeId Store ID
+ */
+export function mapGoogleReviewToFirestore(review: any, userId: string, storeId: string): FirestoreReview {
+    // review.name: accounts/{accountId}/locations/{locationId}/reviews/{reviewId}
+    const reviewId = review.name.split('/').pop() || '';
+
+    return {
+        id: reviewId,
+        storeId: storeId,
+        userId: userId,
+        author: review.reviewer?.displayName || "Google ユーザー",
+        rating: {
+            'ONE': 1,
+            'TWO': 2,
+            'THREE': 3,
+            'FOUR': 4,
+            'FIVE': 5
+        }[review.starRating as string] || 0,
+        content: review.comment || "",
+        source: "google",
+        status: review.reviewReply ? "replied" : "unreplied",
+        replySummary: review.reviewReply?.comment?.substring(0, 100) || undefined,
+        publishedAt: review.createTime ? new Date(review.createTime) : new Date(),
+        fetchedAt: new Date(),
+        updatedAt: new Date(),
+    };
 }
 
 /**

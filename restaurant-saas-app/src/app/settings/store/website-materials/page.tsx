@@ -603,12 +603,12 @@ export default function MaterialsPage() {
                     </CardContent>
                 </Card>
 
-                {/* 5. Instagram投稿用・素材収集 */}
+                {/* 5. Instagram連携・素材収集 */}
                 <Card className="border-pink-200 bg-gradient-to-br from-white to-pink-50/30">
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <Instagram className="w-5 h-5 text-pink-600" />
-                            <CardTitle>5. Instagram投稿用・素材収集</CardTitle>
+                            <CardTitle>5. Instagram連携半自動投稿システム・素材収集</CardTitle>
                         </div>
                         <CardDescription>
                             インスタの規格に合わせた写真撮影が可能です。AIが投稿文を作成する際の参考画像になります。

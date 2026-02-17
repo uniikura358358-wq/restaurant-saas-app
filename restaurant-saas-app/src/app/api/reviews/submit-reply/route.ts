@@ -16,6 +16,53 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        // 開発環境用のデモユーザー対応
+        if (user.uid === "demo-user-id") {
+            const { cookies } = await import("next/headers");
+            const cookieStore = await cookies();
+
+            // 返信済みIDの取得と更新 ('replied_reviews' カンマ区切り)
+            const repliedCookie = cookieStore.get("replied_reviews")?.value || "";
+            let repliedIds = repliedCookie ? repliedCookie.split(',').filter(Boolean) : [];
+
+            // 互換性のための旧形式取得
+            if (repliedIds.length === 0) {
+                const oldJson = cookieStore.get("demo_replied_ids")?.value;
+                if (oldJson) {
+                    try { repliedIds = JSON.parse(oldJson); } catch (e) { }
+                }
+            }
+
+            if (!repliedIds.includes(reviewId)) {
+                repliedIds.push(reviewId);
+                cookieStore.set("replied_reviews", repliedIds.join(','), {
+                    maxAge: 60 * 60 * 24, // 1 day
+                    path: "/"
+                });
+                // 旧形式も念のため同期
+                cookieStore.set("demo_replied_ids", JSON.stringify(repliedIds), {
+                    maxAge: 60 * 60 * 24,
+                    path: "/"
+                });
+            }
+
+            // AI利用回数のインクリメント
+            const aiUsageCookie = cookieStore.get("ai_usage_count")?.value;
+            const currentAiUsage = aiUsageCookie ? parseInt(aiUsageCookie, 10) : 45; // 初期値45とする
+            cookieStore.set("ai_usage_count", (currentAiUsage + 1).toString(), {
+                maxAge: 60 * 60 * 24,
+                path: "/"
+            });
+
+            return NextResponse.json({
+                success: true,
+                reviewId,
+                status: "replied",
+                timestamp: new Date().toISOString(),
+                isDemo: true
+            });
+        }
+
         // 2. Validation
         if (!reviewId || !replyContent) {
             return NextResponse.json(

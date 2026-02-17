@@ -8,9 +8,7 @@ export const requiredEnvVars = [
     "NEXT_PUBLIC_FIREBASE_APP_ID",
 
     // Firebase Admin
-    "FIREBASE_PROJECT_ID",
-    "FIREBASE_CLIENT_EMAIL",
-    "FIREBASE_PRIVATE_KEY",
+    "FIREBASE_SERVICE_ACCOUNT_KEY",
 
     // AI
     "GOOGLE_API_KEY",
