@@ -41,3 +41,9 @@
   - [x] **Build Fix**: `firebase-admin.ts` の環境変数パース堅牢化と API ルートの静的生成エラー解消
   - [x] **Supabaseクリーンアップ**: Supabase関連コード、パッケージ、環境設定の完全削除
   - [x] **資産化**: `10_進行中プロジェクト` & `20_開発ノウハウ` への最新仕様同期
+
+- [x] **Phase 6: Pricing & Revenue Optimization** `[x]`
+  - [x] **Pricing Update**: HP作成代行プランを含む4段階の料金体系（維持管理費込み）へ改定
+  - [x] **UI Refactoring**: `src/app/plans/page.tsx` を新料金体系に合わせて4カラム構成に刷新
+  - [x] **UI/UX Polished**: 切替ボタンの視認性向上（白背景＋オレンジ枠）、価格表記の正確化、ヘッダー削除
+  - [x] **Specification Sync**: `PRICING_PLANS.md` の更新と戦略の定義

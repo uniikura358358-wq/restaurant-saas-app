@@ -22,15 +22,62 @@ const SCENARIO: Record<string, ScenarioStep> = {
         id: 'start',
         botMessage: 'こんにちは！AIサポートアシスタントです。本日はどのようなご用件でしょうか？',
         options: [
-            { label: 'HP制作について相談したい', nextStep: 'hp_intro' },
-            { label: '料金や機能について詳しく', nextStep: 'faq_pricing_menu' },
+            { label: '機能について詳しく教えて下さい', nextStep: 'faq_features_all' },
+            { label: '集客に特化した自動AIサービスについて詳しく', nextStep: 'ai_tools_intro' },
+            { label: 'HP制作パッケージ（HP作成代行）について', nextStep: 'hp_intro' },
+            { label: '料金プランの違いを教えて', nextStep: 'faq_plans_select' },
             { label: 'その他', nextStep: 'other' }
         ]
     },
-    // HP Production Scenario (Polite Version)
+    faq_features_all: {
+        id: 'faq_features_all',
+        botMessage: '全プランの主な機能一覧をご説明します！\n\n【Lightプラン】\n・Google口コミ自動返信代行\n・低評価通知 / 炎上防止\n・MEO集客支援\n\n【Standardプラン】\n上記の全機能に加えて…\n・Instagram自動投稿支援\n・AI画像生成 (60枚/月)\n・リピーター獲得SNS強化\n\n【Premiumプラン】\n最上位の全機能として…\n・AI売上・経営データ分析\n・POP/メニューAI自動作成\n・ライバル店AI監視 (5店舗)\n\n特に気になる機能はございますか？',
+        options: [
+            { label: 'Google口コミ返信', nextStep: 'tool_gmap' },
+            { label: 'Instagram自動投稿', nextStep: 'tool_insta' },
+            { label: 'POP・画像生成', nextStep: 'tool_visual' },
+            { label: '料金プランを見る', nextStep: 'faq_plans_select' }
+        ]
+    },
+    // AI Tools (SaaS Only) Scenario
+    ai_tools_intro: {
+        id: 'ai_tools_intro',
+        botMessage: '集客に特化した自動AIサービスですね！\nこちらは、すでにHPをお持ちの方や、Google/SNSでの集客を真っ先に強化したいオーナー様に最適です。\n\n具体的にどの機能にご興味がありますか？',
+        options: [
+            { label: 'Google口コミのAI自動返信', nextStep: 'tool_gmap' },
+            { label: 'InstagramのAI自動投稿支援', nextStep: 'tool_insta' },
+            { label: 'AIによる画像生成・POP作成', nextStep: 'tool_visual' },
+            { label: '料金について', nextStep: 'faq_plans_select' }
+        ]
+    },
+    tool_gmap: {
+        id: 'tool_gmap',
+        botMessage: 'Googleビジネスプロフィールの口コミ返信をAIが代行します。単なる定型文ではなく、お客様一人一人に合わせた丁寧な返信案を1秒で作成します。\n\nまた、★1や★2の低評価がついた際には即座に通知が届くため、迅速な対応で悪評の拡散を防ぐことができます。',
+        options: [
+            { label: '他の機能も見る', nextStep: 'ai_tools_intro' },
+            { label: '料金プランを見る', nextStep: 'faq_plans_select' }
+        ]
+    },
+    tool_insta: {
+        id: 'tool_insta',
+        botMessage: 'Instagram投稿の「ネタ探し・文章作成・ハッシュタグ選び」をAIがサポートします。\n\nスマホで撮った写真をアップするだけで、AIが魅力的な投稿文を生成。営業の合間にサクッと発信を継続でき、新規客やリピーターの獲得に繋げます。\n※Standardプラン以上でご利用いただけます。',
+        options: [
+            { label: '他の機能も見る', nextStep: 'ai_tools_intro' },
+            { label: '料金プランを見る', nextStep: 'faq_plans_select' }
+        ]
+    },
+    tool_visual: {
+        id: 'tool_visual',
+        botMessage: 'AIがお店のバナー画像や、店内に掲示するPOPのデザインを自動生成します。\n\n「今日のおすすめ」も、文字を入力するだけでAIがプロ級の画像付きPOPにしてくれます。デザイン会社に頼むコストと時間を大幅に節約できますよ！',
+        options: [
+            { label: '他の機能も見る', nextStep: 'ai_tools_intro' },
+            { label: '料金プランを見る', nextStep: 'faq_plans_select' }
+        ]
+    },
+    // HP Production Scenario
     hp_intro: {
         id: 'hp_intro',
-        botMessage: 'HP制作のご相談ですね、ありがとうございます。より良いご提案のために、いくつか簡単な質問をさせてください。\nまず、お店の雰囲気を伝えるための【店内画像】はお手元にご用意ございますでしょうか？',
+        botMessage: 'HP制作ですね、ありがとうございます！\n初期費用 ¥39,800 で、プロ品質の公式Webサイトを制作し、ドメイン・サーバーの維持管理まで丸投げいただけます。\n\nより良い制作のために、いくつか質問させてください。まず、お店の【店内画像】はお手元にご用意ございますか？',
         options: [
             { label: 'はい、用意できます', nextStep: 'hp_menu' },
             { label: 'これから撮影します', nextStep: 'hp_menu_advice' },
@@ -39,34 +86,31 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     hp_menu_advice: {
         id: 'hp_menu_advice',
-        botMessage: 'かしこまりました。最近のスマートフォンは非常に性能が良いので、**スクエア（正方形）モード** で撮影していただければ十分素敵な写真が撮れますよ。\n\n「HPだと余白が出るのでは？」とご心配されるかもしれませんが、正方形の写真が映える **スタイリッシュなカード型レイアウト** を採用しますので、余白や違和感は全く出ません。ご安心ください！\n\n続いてお伺いします。お店のイチオシとなる【売りのメニュー（1〜3商品）】はお決まりでしょうか？\n※基本は3つ商品の見本HPですが、**1つや2つの場合でも柔軟にレイアウトを調整**して作成しますので、無理に3つ揃えなくても大丈夫です！',
+        botMessage: 'かしこまりました。最近のスマホは非常に高性能ですので、**スクエア（正方形）モード** で撮影していただければ十分素敵な写真が撮れますよ。\n\nスタイリッシュなカード型レイアウトを採用しますので、プロ並みの仕上がりになります。続いてお伺いします。お店のイチオシとなる【売りのメニュー（1〜3商品）】はお決まりでしょうか？',
         options: [
             { label: 'はい、決まっています', nextStep: 'hp_menu_photo' },
-            { label: 'まだ迷っています', nextStep: 'hp_menu_consult' },
-            { label: '相談して決めたい', nextStep: 'hp_menu_consult' }
+            { label: 'まだ迷っています', nextStep: 'hp_menu_consult' }
         ]
     },
     hp_photo_req: {
         id: 'hp_photo_req',
-        botMessage: 'プロによる撮影も手配可能です（別途オプションとなります）。プロの写真は、お店の魅力を最大限に引き出してくれますのでおすすめです！\n\n「HPのレイアウトはどうなるの？」という点も、正方形・横長どちらでも美しく見えるようプロが調整しますのでご安心ください。\n\n続いてお伺いします。お店のイチオシとなる【売りのメニュー（1〜3商品）】はお決まりでしょうか？\n※基本は3つ商品の見本HPですが、**1つや2つの場合でも柔軟にレイアウトを調整**して作成しますので、無理に3つ揃えなくても大丈夫です！',
+        botMessage: 'プロによる撮影も手配可能です（別途オプション）。最高の一枚でお店をアピールしましょう！\n\n続いてお伺いします。お店のイチオシとなる【売りのメニュー（1〜3商品）】はお決まりでしょうか？',
         options: [
             { label: 'はい、決まっています', nextStep: 'hp_menu_photo' },
-            { label: 'まだ迷っています', nextStep: 'hp_menu_consult' },
-            { label: '相談して決めたい', nextStep: 'hp_menu_consult' }
+            { label: 'これからの相談で決めたい', nextStep: 'hp_menu_consult' }
         ]
     },
     hp_menu: {
         id: 'hp_menu',
-        botMessage: 'ありがとうございます。やはり実際の写真があると、お客様にお店の魅力が伝わりやすくなりますね！\n\n※メニュー写真は **正方形（1:1、推奨1080×1080px）** がおすすめです。\n「HPだと変な余白が出るんじゃ？」と思われるかもしれませんが、**正方形が綺麗にハマる専用レイアウト** で制作しますので、全く問題ありません！\n\n続いてお伺いします。お店のイチオシとなる【売りのメニュー（1〜3商品）】はお決まりでしょうか？\n※基本は3つ商品の見本HPですが、もし1つや2つの場合でも **柔軟にデザインを調整** して違和感なく仕上げます！',
+        botMessage: 'ありがとうございます！素材があると制作もスムーズです。\n\n続いて、お店のイチオシとなる【売りのメニュー（1〜3商品）】はお決まりでしょうか？\n※1つや2つでも柔軟にレイアウトを調整しますのでご安心ください。',
         options: [
             { label: 'はい、決まっています', nextStep: 'hp_menu_photo' },
-            { label: 'まだ迷っています', nextStep: 'hp_menu_consult' },
-            { label: '相談して決めたい', nextStep: 'hp_menu_consult' }
+            { label: 'まだ迷っています', nextStep: 'hp_menu_consult' }
         ]
     },
     hp_menu_photo: {
         id: 'hp_menu_photo',
-        botMessage: '3商品がお決まりなんですね、素晴らしいです！\nちなみに、その【3商品の写真画像】もお手元にご用意できそうでしょうか？',
+        botMessage: '素晴らしいです！\nちなみに、その【3商品の写真画像】もお手元にご用意できそうでしょうか？',
         options: [
             { label: 'はい、用意できます', nextStep: 'hp_details' },
             { label: '撮影はこれからです', nextStep: 'hp_details_advice' },
@@ -75,17 +119,16 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     hp_menu_consult: {
         id: 'hp_menu_consult',
-        botMessage: 'かしこまりました。ぜひ一緒に考えさせてください。人気メニューや、利益率の高いメニューを選ぶのが一般的におすすめです。\n\n仮にメニューが決まったとして、【商品の写真画像】のご用意はできそうでしょうか？',
+        botMessage: 'かしこまりました。利益率や人気を考慮して一緒に考えましょう！\n\n仮にメニューが決まったとして、【商品の写真画像】のご用意はできそうでしょうか？',
         options: [
             { label: '用意できます', nextStep: 'hp_details' },
             { label: '撮影が必要です', nextStep: 'hp_details_advice' },
             { label: '難しいかもしれません', nextStep: 'hp_proposal_temp_image' }
         ]
     },
-    // New Proposal Step for fast track (Product Images substitute)
     hp_proposal_temp_image: {
         id: 'hp_proposal_temp_image',
-        botMessage: '写真がすぐになくても大丈夫です！商品写真は無理にAIを使わず、\n**「文字だけで魅せるスタイリッシュなメニュー表」** や **「準備中アイコン」** で代用して作成します。\n\nこれなら違和感なく **最短3〜7日** でHPを公開できます！写真は後からスマホで撮って差し替えるだけでOKです。',
+        botMessage: '写真がすぐになくても大丈夫です！\n最初は「文字だけで魅せるメニュー表」で作成し、後からスマホで撮って差し替えることも可能です。これなら **最短3〜7日** でHP公開までいけます！',
         options: [
             { label: 'それなら早くできそう！', nextStep: 'hp_details_fast_track' },
             { label: '写真は自分で用意したい', nextStep: 'hp_details_wait' }
@@ -93,271 +136,111 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     hp_details: {
         id: 'hp_details',
-        botMessage: 'お写真の準備も問題なさそうですね！安心いたしました。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】についてお伺いします。これらがまとまった資料などはございますか？',
+        botMessage: 'お写真の準備も問題なさそうですね！安心いたしました。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】はお手元にございますか？',
         options: [
             { label: 'はい、あります', nextStep: 'hp_closing_dynamic' },
-            { label: 'Googleマップの情報と同じでOK', nextStep: 'hp_closing_gmap' },
+            { label: 'Googleマップと同じでOK', nextStep: 'hp_closing_gmap' },
             { label: 'これからまとめます', nextStep: 'hp_closing_prep' }
         ]
     },
     hp_details_fast_track: {
         id: 'hp_details_fast_track',
-        botMessage: 'ありがとうございます！では仮の形式でスピーディーに進めますね。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】はお手元にございますか？',
+        botMessage: 'ありがとうございます！ではスピーディーに進めますね。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】はございますか？',
         options: [
             { label: 'はい、あります', nextStep: 'hp_closing_dynamic' },
-            { label: 'Googleマップの情報と同じでOK', nextStep: 'hp_closing_gmap' },
-            { label: 'これからまとめます', nextStep: 'hp_closing_prep' }
+            { label: 'Googleマップと同じでOK', nextStep: 'hp_closing_gmap' }
         ]
     },
     hp_details_wait: {
         id: 'hp_details_wait',
-        botMessage: '承知いたしました。こだわりの写真で作りたい場合は、素材が揃ってからの着手となります。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】はお手元にございますか？',
+        botMessage: '承知いたしました。素材が揃い次第、着手させていただきます。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】はお手元にございますか？',
         options: [
             { label: 'はい、あります', nextStep: 'hp_closing_dynamic' },
-            { label: 'Googleマップの情報と同じでOK', nextStep: 'hp_closing_gmap' },
-            { label: 'これからまとめます', nextStep: 'hp_closing_prep' }
+            { label: 'Googleマップと同じでOK', nextStep: 'hp_closing_gmap' }
         ]
     },
     hp_details_advice: {
         id: 'hp_details_advice',
-        botMessage: '承知いたしました。美味しそうな写真は集客の要ですので、ぜひ撮影にチャレンジしてみてください！\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】についてお伺いします。これらがまとまった資料などはございますか？',
+        botMessage: '承知いたしました。美味しそうな写真は集客の要です！撮影、頑張ってくださいね。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】についてはございますか？',
         options: [
             { label: 'はい、あります', nextStep: 'hp_closing_dynamic' },
-            { label: 'Googleマップの情報と同じでOK', nextStep: 'hp_closing_gmap' },
-            { label: 'これからまとめます', nextStep: 'hp_closing_prep' }
+            { label: 'Googleマップと同じでOK', nextStep: 'hp_closing_gmap' }
         ]
     },
-    hp_details_no_photo: {
-        id: 'hp_details_no_photo',
-        botMessage: '写真がない場合でも、テキストの魅力だけでお客様を惹きつけるデザインをご提案できますので、どうぞご安心ください。\n\n最後に、お店の【基本情報（住所・電話番号・営業時間など）】はお分かりになりますでしょうか？',
-        options: [
-            { label: 'はい、大丈夫です', nextStep: 'hp_closing_dynamic' },
-            { label: 'Googleマップの情報と同じでOK', nextStep: 'hp_closing_gmap' },
-            { label: '確認しておきます', nextStep: 'hp_closing_prep' }
-        ]
-    },
-    // New Step: Reassurance for preparing later
     hp_closing_prep: {
         id: 'hp_closing_prep',
-        botMessage: '承知いたしました！お忙しい中ありがとうございます。素材はご契約後の【専用管理画面】から、いつでも少しずつ登録・更新が可能です。\n\nまずは枠だけ確保しておき、準備ができた段階で制作スタートという形も取れますのでご安心ください。\n\n現時点での目安納期をお伝えしてもよろしいでしょうか？',
+        botMessage: '承知いたしました！ご契約後の「専用管理画面」からいつでも追加入力いただけます。\nまずは概算の納期をお伝えしましょうか？',
         options: [
             { label: 'はい、納期を知りたい', nextStep: 'hp_closing_dynamic' }
         ]
     },
-    // Dynamic Outcomes
-    hp_closing_a: { // 最短 (3-7 days)
+    hp_closing_a: {
         id: 'hp_closing_a',
-        botMessage: 'ご確認ありがとうございます。現在の予約状況でしたら、\n**最短3〜7日間** で納品可能です！\n\nこれならすぐに集客を開始できますね。',
+        botMessage: 'ご確認ありがとうございます。現在の状況でしたら、\n**最短3〜7日間** で納品可能です！\n\nすぐに集客を加速させたいオーナー様にぴったりです。',
         options: [
             { label: '料金について詳しく聞く', nextStep: 'hp_price_explanation' }
         ]
     },
-    hp_closing_b: { // 標準 (7-14 days)
+    hp_closing_b: {
         id: 'hp_closing_b',
-        botMessage: 'ご確認ありがとうございます。撮影やメニュー決めを含めても、\n**7日〜14日間程度** で納品可能です。\n\n焦らずしっかり準備して、最高のお店を作りましょう！',
+        botMessage: 'ご確認ありがとうございます。撮影等を含めても、\n**7日〜14日間程度** で納品可能です。\n\n準備を整えて、最高のお店を公開しましょう！',
         options: [
             { label: '料金について詳しく聞く', nextStep: 'hp_price_explanation' }
         ]
     },
-    hp_closing_c: { // じっくり (14-30 days) - Only used when BUSY or Explicitly slow
+    hp_closing_c: {
         id: 'hp_closing_c',
-        botMessage: 'ご確認ありがとうございます。現在非常に多くのご依頼をいただいている関係で、\n**14日間〜30日間程度** の制作期間をいただいております。\n\nその分、一つ一つ丁寧に仕上げさせていただきます！',
-        options: [
-            { label: '料金について詳しく聞く', nextStep: 'hp_price_explanation' }
-        ]
-    },
-    // Pre-closing Confirmation
-    hp_closing_confirm: { // Fallback / unused but kept for safety logic routing
-        id: 'hp_closing_confirm',
-        botMessage: 'ご確認ありがとうございます。必要な情報はすべて揃っているようですね！\nこれなら制作もスムーズに進みます。',
+        botMessage: '現在非常に多くのご依頼をいただいており、\n**14日間〜30日間程度** の制作期間をいただいております。\n\n一つ一つ丁寧に仕上げさせていただきます。',
         options: [
             { label: '料金について詳しく聞く', nextStep: 'hp_price_explanation' }
         ]
     },
     hp_closing_gmap: {
         id: 'hp_closing_gmap',
-        botMessage: 'Googleマップの情報をそのまま使わせていただいて良いとのこと、ありがとうございます！手間が省ける分、少し早く着手できそうです。\n今の状況なら **最短3〜7日間** で納品できます。',
+        botMessage: 'Googleマップの情報を活用することで、手間なくスピーディーに制作可能です！\n現在の状況なら **最短3〜7日間** でお届けできます。',
         options: [
             { label: '料金について詳しく聞く', nextStep: 'hp_price_explanation' }
         ]
     },
-    hp_closing_later: {
-        id: 'hp_closing_later',
-        botMessage: 'かしこまりました！情報が整い次第、いつでもご連絡いただければと思います。\nまずは、概算の料金や今後の流れだけ先にお伝えすることも可能です。',
-        options: [
-            { label: '料金について聞きたい', nextStep: 'hp_price_explanation' },
-            { label: 'また後で来ます', nextStep: 'end_later' }
-        ]
-    },
-    // Detailed Pricing Explanation
     hp_price_explanation: {
         id: 'hp_price_explanation',
-        botMessage: '料金の詳細です。\n\n【Lightプラン】\n◆ HP制作費（初回のみ）： **39,800円**\n◆ 月々の維持管理費： **2,480円**\n\n**【セルフ更新がお得です！】**\n専用の管理画面からスマホでサクッと画像を差し替えるだけで、**追加費用0円・即時反映** で更新いただけます。\n※AIによる文章作成には標準枠（月間20〜30回程度の更新目安）がありますが、万が一足りなくなった場合も **1,000円の追加枠（25〜30回程度の更新目安）** で、上限を気にせず継続利用が可能です！（※追加分は当月末または30日周期でのリセットとなります）\n\n※弊社への作業代行（月額10,000円追加/納期1〜2週間）も承っておりますが、操作はとても簡単ですのでセルフ更新を強くおすすめしております！',
+        botMessage: '料金の詳細です。\n\n【HP制作パッケージ】\n◆ 初期制作費： **39,800円** (初回のみ)\n◆ 月額（維持費込）： **3,280円〜**\n\n【集客AI特化サービス (HPなし)】\n◆ 初期費用： **0円**\n◆ 月額： **3,980円〜**\n\n※Standard（月額9,800円）以上のプランなら、HPを制作した場合も **HP維持費はすべて月額料金に含まれる（実質無料）** ため、大変お得です！',
         options: [
-            { label: 'なるほど、わかりました', nextStep: 'hp_final_check' }
+            { label: 'よくわかりました', nextStep: 'hp_final_check' }
         ]
     },
     hp_final_check: {
         id: 'hp_final_check',
-        botMessage: '最後までお話を聞いてくださりありがとうございます。\nご契約後は、**専用の素材管理画面** からいつでも写真や情報をアップロード・更新できます。\n\nそれでは、このままご契約のお手続きに進んでもよろしいでしょうか？',
+        botMessage: 'ご説明を最後まで聞いてくださり、ありがとうございます。私たちがお店の強力な集客パートナーとなります。\n\nこのままプラン一覧ページをご覧になりますか？',
         options: [
-            { label: 'はい、契約に進みます', nextStep: 'action_payment' },
+            { label: 'はい、プランを見に行く', nextStep: 'action_open_plans' },
             { label: 'もう少し検討する', nextStep: 'end_consider' }
-        ]
-    },
-    // Actions
-    action_payment: {
-        id: 'action_payment',
-        botMessage: 'ありがとうございます！\nそれでは、安全な決済ページへご案内します。\n新しいウィンドウが開きますので、少々お待ちください...',
-        options: []
-    },
-    end_consider: {
-        id: 'end_consider',
-        botMessage: 'もちろんです。お店の未来に関わる重要なお買い物ですので、じっくりご検討ください。\nいつでもここでお待ちしておりますので、またお気軽にお声がけくださいね！',
-        options: [
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    end_later: {
-        id: 'end_later',
-        botMessage: '承知いたしました。\n準備が整いましたら、またいつでもお声がけください。\nお客様の素敵なお店作りのお手伝いができる日を、心よりお待ちしております！',
-        options: [
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    end: {
-        id: 'end',
-        botMessage: '本日はご利用ありがとうございます。\n私たちは常にお客様の挑戦を応援しております。\nまた何かご不明な点があれば、いつでもお声がけください！',
-        options: [
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    // FAQ / Pricing & Features Scenarios
-    faq_pricing_menu: {
-        id: 'faq_pricing_menu',
-        botMessage: '料金や機能についてのご質問ですね。ありがとうございます。\n特に詳しく知りたい内容はございますか？',
-        options: [
-            { label: '各プランの違い・機能詳細', nextStep: 'faq_plans_select' },
-            { label: '解約・契約変更のルール', nextStep: 'faq_contract' },
-            { label: 'サポート体制について', nextStep: 'faq_support' },
-            { label: 'スマホだけで使える？', nextStep: 'faq_device' },
-            { label: '他社からの乗り換え', nextStep: 'faq_switch' },
-            { label: '支払い方法の種類', nextStep: 'faq_payment_methods' },
-            { label: '利用規約について', nextStep: 'faq_terms' },
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    faq_plans_select: {
-        id: 'faq_plans_select',
-        botMessage: 'どのプランについて詳しくご説明しましょうか？',
-        options: [
-            { label: 'Light (Google対策)', nextStep: 'faq_light' },
-            { label: 'Standard (インスタ連携)', nextStep: 'faq_standard' },
-            { label: 'Premium (全機能・売上UP)', nextStep: 'faq_premium' },
-            { label: '全て比較したい', nextStep: 'faq_compare' }
-        ]
-    },
-    faq_light: {
-        id: 'faq_light',
-        botMessage: '【Lightプラン (月額2,480円)】\n\nGoogleビジネスプロフィールの運用を効率化するプランです。\n\n**主な機能:**\n- **口コミ一元管理**: 全ての口コミをダッシュボードで確認\n- **AI自動返信**: 高度なAIが最適な返信案を1クリックで作成\n- **低評価通知**: ★1や★2がついた瞬間に通知し、炎上を防止\n\nまずは「お店の信頼性」を高めたい方に最適です！',
-        options: [
-            { label: '他のプランも見る', nextStep: 'faq_plans_select' },
-            { label: '契約について聞きたい', nextStep: 'faq_contract' },
-            { label: '十分わかりました', nextStep: 'end_faq' }
-        ]
-    },
-    faq_standard: {
-        id: 'faq_standard',
-        botMessage: '【Standardプラン (月額9,800円)】\n\nLightプランに加え、Instagram集客を強化する人気プランです。\n\n**追加機能:**\n- **Instagram連携半自動投稿システム**: 面倒な投稿作業をボタン一つで完了\n- **リピーター獲得**: SNS発信を継続し、ファンを育てます\n\n「新規客」と「リピーター」の両方を獲得したい方におすすめです！',
-        options: [
-            { label: '他のプランも見る', nextStep: 'faq_plans_select' },
-            { label: '契約について聞きたい', nextStep: 'faq_contract' },
-            { label: '十分わかりました', nextStep: 'end_faq' }
-        ]
-    },
-    faq_premium: {
-        id: 'faq_premium',
-        botMessage: '【Premiumプラン (月額12,800円)】\n\n全ての機能に加え、AIによる売上最大化支援がついた最上位プランです。\n\n**特別機能:**\n- **POP/メニューAI作成**: 魅力的な販促物を数秒で作成\n- **顧客分析AI**: 客層や来店傾向を分析し、経営改善を提案\n- **優先サポート**: 困った時に優先的に対応\n\n「もっと売上を伸ばしたい」という本気のオーナー様のためのプランです！',
-        options: [
-            { label: '他のプランも見る', nextStep: 'faq_plans_select' },
-            { label: '契約について聞きたい', nextStep: 'faq_contract' },
-            { label: '十分わかりました', nextStep: 'end_faq' }
-        ]
-    },
-    faq_compare: {
-        id: 'faq_compare',
-        botMessage: '簡単比較させていただきます！\n\n◆ **Light (2,480円)**: Google口コミ管理のみ\n◆ **Standard (9,800円)**: ＋インスタ連携 (**迷ったらコレ！**)\n◆ **Premium (12,800円)**: ＋POP作成・分析機能\n\nまずはStandardで始めて、必要に応じて変更するのもおすすめです。',
-        options: [
-            { label: '詳しい機能を見る', nextStep: 'faq_plans_select' },
-            { label: '契約ルールへ', nextStep: 'faq_contract' },
-            { label: 'よくわかりました', nextStep: 'end_faq' }
-        ]
-    },
-    faq_contract: {
-        id: 'faq_contract',
-        botMessage: 'ご契約に関するルールはこちらです。\n\n◆ **アップグレード**: いつでも即時可能です（差額のみ日割り請求）。機能はすぐに使えます。\n◆ **解約・ダウングレード**: いつでも申請可能ですが、適用は「現在の請求期間（月/年）の終了後」となります。\n\n期間縛りや違約金などは一切ございませんので、安心してお試しいただけます！',
-        options: [
-            { label: '機能について戻る', nextStep: 'faq_pricing_menu' },
-            { label: 'プランを見に行く', nextStep: 'action_open_plans' },
-            { label: '質問を終了する', nextStep: 'end_faq' }
-        ]
-    },
-    faq_support: {
-        id: 'faq_support',
-        botMessage: 'サポート体制についてご説明します。\n\n基本機能の使い方は、管理画面内のガイドですぐに解決できます。\nもしご不明点があれば、**専用チャットまたはメール** でいつでもご相談いただけます。\n\nPremiumプランのお客様には、**優先サポートデスク** が対応し、経営相談も含めてより手厚くバックアップいたします！',
-        options: [
-            { label: '他の質問を見る', nextStep: 'faq_pricing_menu' },
-            { label: '質問を終了する', nextStep: 'end_faq' }
-        ]
-    },
-    faq_device: {
-        id: 'faq_device',
-        botMessage: 'デバイスについてのご質問ですね。\n\n**スマホ完全対応** ですので、パソコンをお持ちでなくても全く問題ありません！\nメニューの更新、口コミへの返信、HPの修正など、**全ての機能がスマートフォン1台で完結** します。\n\n忙しい営業の合間でも、スマホでサクッと操作できるのが最大の魅力です。',
-        options: [
-            { label: '他の質問を見る', nextStep: 'faq_pricing_menu' },
-            { label: '質問を終了する', nextStep: 'end_faq' }
-        ]
-    },
-    faq_switch: {
-        id: 'faq_switch',
-        botMessage: '他社サービスからのお乗り換えも大歓迎です！\n\n現在ホームページをお持ちの場合、そのURLを教えていただければ、**AIが情報を読み取って初期設定をサポート** することも可能です（制作時にお申し付けください）。\n\nGoogleマップの情報もそのまま引き継げますので、データ移行の手間はほとんどかかりません。スムーズに新しい環境へ移行できますよ！',
-        options: [
-            { label: '他の質問を見る', nextStep: 'faq_pricing_menu' },
-            { label: '質問を終了する', nextStep: 'end_faq' }
-        ]
-    },
-    faq_payment_methods: {
-        id: 'faq_payment_methods',
-        botMessage: 'お支払い方法についてです。\n\n**クレジットカード決済**（Visa, Mastercard, Amex, JCB等）および、**銀行振込**（専用のバーチャル口座宛）に対応しております。\n\n法人・個人のお客様問わず、どちらのお支払い方法も自由にお選びいただけます。',
-        options: [
-            { label: '他の質問を見る', nextStep: 'faq_pricing_menu' },
-            { label: '契約について', nextStep: 'faq_contract' },
-            { label: '質問を終了する', nextStep: 'end_faq' }
-        ]
-    },
-    faq_terms: {
-        id: 'faq_terms',
-        botMessage: '利用規約については、お客様の店舗情報や顧客データを厳格に保護することをお約束しています。\n商用利用可能なAI生成コンテンツの著作権や、データの取り扱いについての詳細は、以下のリンク（公式サイト下部）からご確認いただけます。\n\nご不明な点があれば、サポートまでお問い合わせください。',
-        options: [
-            { label: 'メニューに戻る', nextStep: 'faq_pricing_menu' },
-            { label: '質問を終了する', nextStep: 'end_faq' }
         ]
     },
     action_open_plans: {
         id: 'action_open_plans',
-        botMessage: 'かしこまりました。料金プラン一覧ページへご案内します。\nぜひ、お店にぴったりのプランを見つけてくださいね！',
-        options: [] // In prompt logic, we will redirect
+        botMessage: 'かしこまりました。プラン一覧から、お店にぴったりのものをお選びください！',
+        options: []
     },
-    end_faq: {
-        id: 'end_faq',
-        botMessage: 'ご質問ありがとうございます。少しでも疑問が解消されていれば幸いです。\n私たちは常にお客様の味方です。またいつでもお気兼ねなくご相談ください！',
+    faq_plans_select: {
+        id: 'faq_plans_select',
+        botMessage: '料金プランの違いについてですね。\n\n◆ **Light (3,980円)**: Google口コミ自動返信・MEO対策。新規客の信頼獲得に。\n◆ **Standard (9,800円)**: ＋Instagram自動投稿。リピーターを増やしたい人気店に。\n◆ **Premium (14,800円)**: 全機能 ＋AI売上分析・経営相談。売上最大化を目指すオーナー様へ。\n\n※いずれのプランも年払いで **最大17%お得** になります！',
         options: [
+            { label: '集客機能について詳しく', nextStep: 'ai_tools_intro' },
+            { label: 'HP制作との同時契約は？', nextStep: 'hp_price_explanation' },
             { label: '最初に戻る', nextStep: 'start' }
         ]
     },
     other: {
         id: 'other',
-        botMessage: 'その他のお問い合わせですね。以下のよくある質問から選んでいただくか、直接入力もお試しいただけます。',
+        botMessage: 'その他のお問い合わせですね。AIで解決できない複雑なご相談については、今後お知らせする専用メールアドレスでも個別に受け付け可能です。\n\nまずはAIが精一杯サポートさせていただきますので、気になることを入力してみてください！',
+        options: [
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    end_consider: {
+        id: 'end_consider',
+        botMessage: 'もちろんです。いつでもここでお待ちしております！',
         options: [
             { label: '最初に戻る', nextStep: 'start' }
         ]
@@ -511,12 +394,16 @@ export function CustomerSupportChat() {
         // Simulate AI processing (Fallback to keyword match if not in scenario)
         setTimeout(() => {
             const lowerText = text.toLowerCase();
-            let botResponse = "申し訳ありません。その質問にはまだ答えられませんが、担当者にお繋ぎすることは可能です。";
+            let botResponse = "申し訳ありません。その質問にはまだ正確にお答えできませんが、AIが学習を進めております。お急ぎの場合は、今後お知らせする専用メールアドレスへのお問い合わせも可能です。";
             let nextOptions = SCENARIO.start.options;
 
             // Simple Keyword Matching
-            if (lowerText.includes('料金') || lowerText.includes('値段')) {
-                botResponse = "Lightプランは月額2,480円、Standardプランは月額9,800円からです。";
+            if (lowerText.includes('機能') || lowerText.includes('できること')) {
+                botResponse = SCENARIO.faq_features_all.botMessage;
+                nextOptions = SCENARIO.faq_features_all.options;
+            } else if (lowerText.includes('料金') || lowerText.includes('値段') || lowerText.includes('プラン')) {
+                botResponse = SCENARIO.faq_plans_select.botMessage;
+                nextOptions = SCENARIO.faq_plans_select.options;
             } else if (lowerText.includes('hp') || lowerText.includes('制作')) {
                 botResponse = SCENARIO.hp_intro.botMessage;
                 nextOptions = SCENARIO.hp_intro.options;
