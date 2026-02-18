@@ -14,9 +14,11 @@ export async function POST(request: Request) {
             store_name,
             store_area,
             ai_tone,
-            // default_signature, // legacy
-            // emoji_level, // legacy
-            // reply_config, // legacy
+            default_signature,
+            emoji_level,
+            auto_reply_delay_minutes,
+            reply_config,
+            reply_templates,
             notification_config,
             sms_limit_override
         } = body;
@@ -48,6 +50,11 @@ export async function POST(request: Request) {
         if (store_name !== undefined) updateData.storeName = store_name;
         if (store_area !== undefined) updateData.address = store_area;
         if (ai_tone !== undefined) updateData.aiTone = ai_tone;
+        if (default_signature !== undefined) updateData.defaultSignature = default_signature;
+        if (emoji_level !== undefined) updateData.emojiLevel = emoji_level;
+        if (auto_reply_delay_minutes !== undefined) updateData.autoReplyDelayMinutes = auto_reply_delay_minutes;
+        if (reply_config !== undefined) updateData.replyConfig = reply_config;
+        if (reply_templates !== undefined) updateData.replyTemplates = reply_templates;
         if (notification_config !== undefined) updateData.notificationConfig = notification_config;
         if (sms_limit_override !== undefined) updateData.smsLimitOverride = sms_limit_override;
 

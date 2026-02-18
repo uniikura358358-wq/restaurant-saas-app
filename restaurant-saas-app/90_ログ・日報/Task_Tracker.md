@@ -5,6 +5,15 @@
   - [x] 応答生成の確認 (コード整合性確認)
   - [x] UI連携時の認証エラー修正
   - [x] 重複コンポーネント (PascalCaseファイル) の削除
+- [x] **Phase 14: Customer Support Chat Globalization & Emoji Refinement** `[x]`
+  - [x] **RootLayout Integration**: Move `CustomerSupportChat` to `RootLayout` for sitewide availability.
+  - [x] **Clean Up**: Removed redundant instances of `CustomerSupportChat` from individual pages.
+  - [x] **Emoji Logic Update**: Fixed `EMOJI_REGEX` to handle ZWJ sequences (e.g., 🙇‍♂️) as one character.
+  - [x] **Prompt Optimization**: Enhanced Star 1/2 instructions to ensure 2 emojis max and prioritize apology signs.
+  - [x] **Scenario Branching**: Implemented `SCENARIO_SALES` and `SCENARIO_MEMBER` with path-based switching (`usePathname`).
+  - [x] **Member Q&A**: Added guide content for Google AI, Instagram integration, Settings, and Billing.
+  - [x] **Revenue Boost Guide**: Integrated "売上が上がるテクニック集" (Phase 15) with specific tips for SEO and branding.
+  - [x] **HP Usage Guide**: Implemented step-by-step lecture for Image Upload, Menu Update, and Daily Menu (Phase 16).
 - [x] 日報・ダッシュボード更新
   - [x] `Dashboard.md` の更新
   - [x] 日報の作成
@@ -45,5 +54,53 @@
 - [x] **Phase 6: Pricing & Revenue Optimization** `[x]`
   - [x] **Pricing Update**: HP作成代行プランを含む4段階の料金体系（維持管理費込み）へ改定
   - [x] **UI Refactoring**: `src/app/plans/page.tsx` を新料金体系に合わせて4カラム構成に刷新
+  - [x] Light Plan & WEB Member Yearly Adjustment: ライトプラン・WEB会員の年払いを「11ヶ月分」へ個別調整し完全同期
   - [x] **UI/UX Polished**: 切替ボタンの視認性向上（白背景＋オレンジ枠）、価格表記の正確化、ヘッダー削除
   - [x] **Specification Sync**: `PRICING_PLANS.md` の更新と戦略の定義
+- [x] **Phase 7: UI/UX Fine-tuning & Polishing** `[x]`
+  - [x] HP制作初期費用バナーをオレンジに戻し、SkyBlueボタンを追加
+  - [x] **SaaS切替バナー（青）**: HP制作バナーと同じサイズに統一・配置最適化
+  - [x] **WEB各プランの機能詳細化**: 全てのHP制作プランに具体的機能リストを追加
+  - [x] **レイアウトの安定化**: 枠サイズの固定とフォントサイズの微調整
+  - [x] **料金プランUIの視覚的強調**:
+    - [x] 機能リスト（アイコン・テキスト）のサイズを25%拡大
+    - [x] プラン継承見出し（XXX PLANの全機能 ＋）のサイズを15%拡大
+  - [x] **Single Source of Truth 確立**:
+    - [x] 販売ページ（page.tsx）を「正」として、全仕様書・ドキュメントを同期完了
+
+- [x] **Phase 8: Legal & Compliance** `[x]`
+  - [x] **Legal Pages Implementation**: Terms of Service, Privacy Policy, SCTA notice.
+  - [x] **Hardened Terms**: Added specific clauses for AI-generated responsibility and platform dependency disclaimers.
+  - [x] **Universal Footer**: Created `Footer.tsx` and integrated it into `RootLayout` for sitewide legal compliance.
+  - [x] **Doc Sync**: Updated `Dashboard.md` and Daily Reports.
+
+- [x] **Phase 9: Dashboard Refresh & 2FA Implementation** `[x]`
+  - [x] **UI Polishing**: Sidebar refresh with user account menu & clickable details.
+  - [x] **Announcement System**: Integrated notification bell with popup announcements.
+  - [x] **Account Management**: Created `/settings/account` page for profile & security management.
+  - [x] **Two-Factor Authentication (2FA)**: Implemented TOTP & Email OTP setup and integrated into login flow.
+  - [x] **Dark Mode Support**: Replaced hardcoded colors across all management screens (`/dashboard`, `/settings/*`) with theme-aware variables to ensure visibility and contrast.
+  - [x] **Final Sync**: Updated all related documentation and task trackers.
+
+- [x] **Phase 10: AI Quota Separation & Dashboard Logic Fix** `[x]`
+  - [x] **Plan Mapping**: Normalized plan names (Standard/Pro) for accurate quota detection.
+  - [x] **Quota Separation**: Physically separated "Text Generation" and "Image Generation" into two independent metrics.
+  - [x] **Dashboard UI**: Expanded KPI grid to 5 columns with dedicated cards for text and image credits.
+  - [x] **Optimistic UI**: Implemented immediate countdown for text usage upon successful reply.
+  - [x] **Admin Fix**: Synced "Plan Mask" to Server Actions via cookies and corrected Standard quota (0 images).
+- [x] **Phase 12: Gemini 3 Pro Strategy & Quota Expansion** `[x]`
+  - [x] **Reasoning Validation**: Benchmark confirmed Gemini 3 Pro (LOW) superiority for review replies.
+  - [x] **Model Strategy**: Defined 3 Pro LOW as primary, 3 Flash as secondary for all text features.
+  - [x] **Quota Re-design**: Expanded text/image limits based on owner's cost ceiling (Standard: 500/50, Pro: 1000/200, Premium: 2000/450).
+  - [x] **System Update**: Updated `lib/ai-quota.ts` constants and `PRICING_PLANS.md` specifications.
+- [x] **Phase 17: HP Management Navigation** `[x]`
+  - [x] サイドバーへの「HPコンテンツ管理」リンク追加とアイコン設定
+  - [x] `MaterialsPage` への共通サイドバーレイアウト適用
+- [x] **Phase 18: Plan Gating & Navigation Optimization** `[x]`
+  - [x] `usePlanGuard` ロジックの修正（名称一部一致での判定へ）
+  - [x] ツール単体プランとWEBプランの分離（サイドバーの出し分け）
+- [x] **Troubleshooting**: メモリ異常消費プロセスの特定と強制終了 (検証スクリプトのハングアップ解消)
+- [x] **Phase 20: Project Cleanup** `[x]`
+  - [x] 不要な検証用スクリプト（scripts/）13ファイルの削除
+  - [x] 旧環境（supabase/）ディレクトリの完全削除
+  - [x] 削除に伴うインポート・型不備の解消とビルド正常化

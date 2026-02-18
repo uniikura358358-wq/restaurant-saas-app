@@ -53,8 +53,8 @@ export async function GET(request: Request) {
         const hasBusiness = memberships.data.some((m: any) => m.product_id === process.env.WHOP_PRODUCT_ID_BUSINESS);
         const hasLight = memberships.data.some((m: any) => m.product_id === process.env.WHOP_PRODUCT_ID_LIGHT);
 
-        const planStatus = (hasBusiness || hasLight) ? 'active' : 'free';
-        const planName = hasBusiness ? 'Business' : (hasLight ? 'Light' : 'Free');
+        const planStatus = (hasBusiness || hasLight) ? 'active' : 'web Light';
+        const planName = hasBusiness ? 'Business' : (hasLight ? 'Light' : 'web Light');
 
         // 4. Update or Create User in Firebase (Linking Whop to Firebase)
 
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
         await adminDb.collection('users').doc(uid).set({
             email: whopUser.email,
             whopId: whopUser.id,
-            plan: planName.toLowerCase(), // 'business' | 'light' | 'free'
+            plan: planName.toLowerCase(), // 'business' | 'light' | 'web light'
             subscriptionStatus: planStatus,
             planName: planName, // deprecated but keep for compatibility if needed
             updatedAt: FieldValue.serverTimestamp(),

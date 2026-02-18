@@ -2,27 +2,27 @@ export const STRIPE_PLANS = {
     // Sets (17% OFF)
     BUSINESS: {
         id: 'price_business_monthly', // Placeholder
-        name: 'Standard Plan',
+        name: 'Pro',
         price: 9800,
         interval: 'month',
         type: 'set',
         yearly: {
             id: 'price_business_yearly', // Placeholder
-            price: 97600,
-            discountLabel: '17% OFF / 約2ヶ月分無料',
+            price: 98000,
+            discountLabel: '17% OFF / 2ヶ月分無料',
             badge: '🥇'
         }
     },
     BUSINESS_PREMIUM: {
         id: 'price_business_premium_monthly',
-        name: 'Premium Plan',
-        price: 12800,
+        name: 'Pro Premium',
+        price: 14800,
         interval: 'month',
         type: 'set',
         yearly: {
             id: 'price_business_premium_yearly',
-            price: 127400,
-            discountLabel: '17% OFF / 最も選ばれています',
+            price: 148000,
+            discountLabel: '17% OFF / 2ヶ月分無料',
             badge: '🏆'
         }
     },
@@ -30,20 +30,20 @@ export const STRIPE_PLANS = {
     // Singles (13% OFF)
     LIGHT: {
         id: 'price_light_monthly',
-        name: 'Light Plan',
-        price: 2480,
+        name: 'Standard',
+        price: 3980,
         interval: 'month',
         type: 'single',
         yearly: {
             id: 'price_light_yearly',
-            price: 25800,
-            discountLabel: '13% OFF / 1.5ヶ月分無料',
+            price: 43780,
+            discountLabel: '17% OFF / 1ヶ月分お得',
             badge: '🥈'
         }
     },
     STANDARD: {
         id: 'price_standard_monthly',
-        name: 'Standard (Instagram)',
+        name: 'Pro (Instagram)',
         price: 7980,
         interval: 'month',
         type: 'single',

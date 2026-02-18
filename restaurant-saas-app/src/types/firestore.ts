@@ -16,13 +16,33 @@ export interface DashboardStats {
     averageRating: number;
     lowRatingCount: number; // 星1-2の数
     aiUsage?: {
-        sent: number;
-        limit: number;
-        remaining: number;
+        text: {
+            sent: number;
+            limit: number;
+            remaining: number;
+        };
+        image: {
+            sent: number;
+            limit: number;
+            remaining: number;
+        };
     };
     planName?: string;
     storeName?: string;
+    nextPaymentDate?: Timestamp | Date | null; // 次回支払日
     updatedAt: Timestamp | Date;
+}
+
+/**
+ * announcements/{id}
+ * 運営からのお知らせデータ。
+ */
+export interface Announcement {
+    id: string;
+    title: string;
+    content: string;
+    isRead?: boolean;
+    createdAt: Timestamp | Date;
 }
 
 /**

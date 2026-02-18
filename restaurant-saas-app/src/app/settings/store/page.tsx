@@ -45,6 +45,7 @@ export interface ToneConfigData {
     ai_tone: string;
     default_signature: string;
     emoji_level: number;
+    auto_reply_delay_minutes: number;
     reply_config: ReplyConfig;
     reply_templates: Record<string, { title: string; body: string }>;
 }
@@ -73,6 +74,7 @@ const DEFAULT_CONFIG: ToneConfigData = {
     ai_tone: "polite",
     default_signature: "",
     emoji_level: 2,
+    auto_reply_delay_minutes: 30,
     reply_config: {
         "1": "manual",
         "2": "manual",
@@ -166,6 +168,7 @@ function StoreSettingsContent() {
                 ai_tone: data.ai_tone || "polite",
                 default_signature: data.default_signature || "",
                 emoji_level: data.emoji_level ?? 2,
+                auto_reply_delay_minutes: data.auto_reply_delay_minutes ?? 30,
                 reply_config: data.reply_config ?? DEFAULT_CONFIG.reply_config,
                 reply_templates: data.reply_templates || DEFAULT_CONFIG.reply_templates,
             });
@@ -392,26 +395,34 @@ function StoreSettingsContent() {
                         ) : (
                             <div className="space-y-6 pb-24">
                                 <Tabs defaultValue="general">
-                                    <TabsList className="w-full justify-start bg-muted/50 rounded-2xl p-1 h-auto gap-2">
+                                    <TabsList className="w-full justify-start bg-muted/30 border-2 border-primary/20 rounded-2xl p-1.5 h-auto gap-1.5 mb-8 shadow-sm">
                                         <TabsTrigger
                                             value="general"
-                                            className="flex items-center gap-2 rounded-xl px-4 py-2 text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md hover:bg-muted/60 hover:text-foreground transition-all duration-200"
+                                            className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
                                         >
                                             <Settings2 className="size-4" />
-                                            基本設定
+                                            <span>共通設定</span>
                                         </TabsTrigger>
                                         <TabsTrigger
-                                            value="features"
-                                            className="group relative overflow-hidden flex items-center gap-2 rounded-xl px-4 py-2 transition-all duration-500
-                                            data-[state=active]:bg-[#84cc16] data-[state=active]:text-white data-[state=active]:shadow-md
-                                            data-[state=inactive]:bg-background/80 data-[state=inactive]:ring-2 data-[state=inactive]:ring-indigo-400/50 data-[state=inactive]:shadow-[0_0_15px_rgba(99,102,241,0.25)]
-                                            hover:data-[state=inactive]:ring-indigo-500 hover:data-[state=inactive]:shadow-[0_0_25px_rgba(99,102,241,0.4)]"
+                                            value="reviews"
+                                            className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
                                         >
-                                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 data-[state=inactive]:opacity-100 transition-opacity" />
-                                            <MessageSquareShare className="size-4 text-indigo-600 data-[state=active]:text-current z-10" />
-                                            <span className="font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent data-[state=active]:text-current z-10">
-                                                口コミ・SNS設定
-                                            </span>
+                                            <Star className="size-4 text-yellow-500" />
+                                            <span>Google口コミ</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="instagram"
+                                            className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
+                                        >
+                                            <Instagram className="size-4 text-orange-500" />
+                                            <span>Instagram</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="testing"
+                                            className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
+                                        >
+                                            <Sparkles className="size-4 text-blue-500" />
+                                            <span>動作確認</span>
                                         </TabsTrigger>
                                     </TabsList>
 
@@ -495,16 +506,21 @@ function StoreSettingsContent() {
                                         </div>
                                     </TabsContent>
 
-                                    <TabsContent value="features">
+                                    <TabsContent value="reviews">
                                         <div className="space-y-8">
                                             <Card className="shadow-sm">
-                                                <CardHeader>
-                                                    <CardTitle className="flex items-center gap-2">
-                                                        <Star className="size-5 text-yellow-500" />
-                                                        Google 口コミ返信設定
-                                                    </CardTitle>
+                                                <CardHeader className="flex flex-row items-center justify-between">
+                                                    <div>
+                                                        <CardTitle className="flex items-center gap-2">
+                                                            <Star className="size-5 text-yellow-500" />
+                                                            自動返信の対象設定
+                                                        </CardTitle>
+                                                        <div className="text-sm text-muted-foreground mt-1">
+                                                            特定の評価（星数）に対して自動返信を有効にします。
+                                                        </div>
+                                                    </div>
                                                 </CardHeader>
-                                                <CardContent className="space-y-8">
+                                                <CardContent className="space-y-4">
                                                     <div className="divide-y">
                                                         {(["5", "4", "3", "2", "1"] as const).map((star) => (
                                                             <div key={star} className="flex items-center justify-between py-4">
@@ -526,7 +542,64 @@ function StoreSettingsContent() {
                                                             </div>
                                                         ))}
                                                     </div>
+                                                </CardContent>
+                                            </Card>
 
+                                            <Card className="shadow-sm border-primary/20 bg-primary/5">
+                                                <CardHeader>
+                                                    <CardTitle className="flex items-center gap-2 text-blue-600">
+                                                        <RefreshCcw className="size-5" />
+                                                        自動返信のタイムラグ設定
+                                                    </CardTitle>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        口コミ投稿からAIが返信するまでの待機時間を設定します。即座に返信せず時間を置くことで、より自然な対応になります。
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="space-y-6">
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label className="text-base font-bold">待機時間: {
+                                                                config.auto_reply_delay_minutes >= 60
+                                                                    ? `${Math.floor(config.auto_reply_delay_minutes / 60)}時間`
+                                                                    : `${config.auto_reply_delay_minutes}分`
+                                                            }</Label>
+                                                            <div className="flex gap-2">
+                                                                {[10, 30, 60, 180, 1440].map((mins) => (
+                                                                    <Button
+                                                                        key={mins}
+                                                                        variant={config.auto_reply_delay_minutes === mins ? "default" : "outline"}
+                                                                        size="sm"
+                                                                        className="h-8 text-[11px] px-2"
+                                                                        onClick={() => setConfig({ ...config, auto_reply_delay_minutes: mins })}
+                                                                    >
+                                                                        {mins >= 60 ? `${mins / 60}h` : `${mins}m`}
+                                                                    </Button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        <Slider
+                                                            value={[config.auto_reply_delay_minutes]}
+                                                            onValueChange={(v) => setConfig({ ...config, auto_reply_delay_minutes: v[0] })}
+                                                            max={1440}
+                                                            step={10}
+                                                            className="py-4"
+                                                        />
+                                                        <div className="flex justify-between text-[10px] text-muted-foreground px-1">
+                                                            <span>短い（10分）</span>
+                                                            <span>長い（24時間）</span>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            <Card className="shadow-sm">
+                                                <CardHeader>
+                                                    <CardTitle className="flex items-center gap-2">
+                                                        <FileText className="size-5 text-primary" />
+                                                        返信テンプレート設定
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
                                                     <Accordion
                                                         type="single"
                                                         collapsible
@@ -603,29 +676,35 @@ function StoreSettingsContent() {
                                                             </AccordionItem>
                                                         ))}
                                                     </Accordion>
-
-                                                    <div className="pt-6 border-t">
-                                                        <div className="space-y-3">
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <FileText className="size-5 text-blue-500" />
-                                                                <h3 className="font-semibold text-base">署名設定</h3>
-                                                            </div>
-                                                            <Label htmlFor="default_signature" className="text-foreground">署名（任意）</Label>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                Google口コミ返信の末尾に付けたい場合に設定してください。
-                                                            </div>
-                                                            <Input
-                                                                id="default_signature"
-                                                                value={config.default_signature}
-                                                                onChange={(e) => setConfig({ ...config, default_signature: e.target.value })}
-                                                                placeholder="例: 〇〇店 店長"
-                                                                className="max-w-md h-11"
-                                                            />
-                                                        </div>
-                                                    </div>
                                                 </CardContent>
                                             </Card>
 
+                                            <Card className="shadow-sm">
+                                                <CardHeader>
+                                                    <CardTitle className="flex items-center gap-2">
+                                                        <FileText className="size-5 text-blue-500" />
+                                                        署名設定
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-3">
+                                                    <Label htmlFor="default_signature" className="text-foreground">署名（任意）</Label>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Google口コミ返信の末尾に付けたい場合に設定してください。
+                                                    </div>
+                                                    <Input
+                                                        id="default_signature"
+                                                        value={config.default_signature}
+                                                        onChange={(e) => setConfig({ ...config, default_signature: e.target.value })}
+                                                        placeholder="例: 〇〇店 店長"
+                                                        className="max-w-md h-11"
+                                                    />
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="instagram">
+                                        <div className="space-y-8">
                                             <Card className="shadow-sm border-orange-200">
                                                 <CardHeader>
                                                     <CardTitle className="flex items-center gap-2 text-orange-500">
@@ -634,7 +713,6 @@ function StoreSettingsContent() {
                                                     </CardTitle>
                                                 </CardHeader>
                                                 <div className="relative">
-                                                    {/* ロックオーバーレイ */}
                                                     {!hasFeature('instagram') && (
                                                         <div className="absolute inset-0 z-10 backdrop-blur-[2px] bg-background/50 flex flex-col items-center justify-center text-center p-6 rounded-lg border border-dashed border-muted-foreground/20">
                                                             <div className="p-3 bg-muted rounded-full mb-4">
@@ -736,13 +814,20 @@ function StoreSettingsContent() {
                                                     </CardContent>
                                                 </div>
                                             </Card>
+                                        </div>
+                                    </TabsContent>
 
+                                    <TabsContent value="testing">
+                                        <div className="space-y-8">
                                             <Card className="shadow-sm">
                                                 <CardHeader>
                                                     <CardTitle className="flex items-center gap-2 text-blue-600">
                                                         <Sparkles className="size-5" />
                                                         AI返信テスト
                                                     </CardTitle>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        現在の設定（トーン、絵文字、テンプレート）でAIがどのような回答を作成するか試せます。
+                                                    </div>
                                                 </CardHeader>
                                                 <CardContent className="space-y-6">
                                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -791,13 +876,13 @@ function StoreSettingsContent() {
                                                         disabled={aiTestLoading}
                                                         className="w-full"
                                                     >
-                                                        {aiTestLoading ? "生成中..." : "AI返信テスト"}
+                                                        {aiTestLoading ? "生成中..." : "AI返信テストを実行"}
                                                     </Button>
 
                                                     {aiTestReply && (
-                                                        <div className="space-y-2">
-                                                            <Label className="text-xs text-muted-foreground">生成結果</Label>
-                                                            <Textarea value={aiTestReply} readOnly className="min-h-[140px]" />
+                                                        <div className="space-y-2 animate-in fade-in duration-500">
+                                                            <Label className="text-xs text-muted-foreground font-bold">生成された返信文（プレビュー）</Label>
+                                                            <Textarea value={aiTestReply} readOnly className="min-h-[140px] bg-muted/30 border-dashed" />
                                                         </div>
                                                     )}
                                                 </CardContent>

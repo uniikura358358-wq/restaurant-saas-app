@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type SimulatedPlan = 'Free' | 'Light' | 'Standard' | 'Premium' | null;
+type SimulatedPlan = 'web Light' | 'web Standard' | 'web Pro' | 'web Pro Premium' | null;
 
 interface AdminDebugContextType {
     simulatedPlan: SimulatedPlan;
@@ -29,8 +29,11 @@ export function AdminDebugProvider({ children, currentUserId }: { children: Reac
         setSimulatedPlanState(plan);
         if (plan) {
             localStorage.setItem('simulatedPlan', plan);
+            // Cookie にも保存してサーバー側 (Server Actions) で読み取れるようにする
+            document.cookie = `simulated_plan=${encodeURIComponent(plan)}; path=/; max-age=${60 * 60 * 24}`;
         } else {
             localStorage.removeItem('simulatedPlan');
+            document.cookie = `simulated_plan=; path=/; max-age=0`;
         }
     };
 

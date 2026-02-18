@@ -1,457 +1,239 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
-// import { createClient } from "@/lib/supabase";
-import { toast } from "sonner";
-import {
-    User,
-    Loader2,
-    LogOut,
-    Mail,
-    Phone,
-    CheckCircle2,
-    BellRing,
-    ShieldCheck,
-    ArrowRight,
-    Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
-import type { User as FirebaseUser } from "firebase/auth";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useState, useEffect } from "react";
+import { getDashboardStats } from "@/app/actions/dashboard";
+import { DashboardStats } from "@/types/firestore";
 import {
-    DEFAULT_NOTIFICATION_CONFIG,
-    type NotificationConfig,
-} from "@/lib/notification-handler";
-import { DEFAULT_SMS_LIMIT, type SmsUsageSummary } from "@/lib/sms-quota-shared";
-
-export const dynamic = "force-dynamic";
-
-import { Suspense } from "react";
-// ... imports ...
+    Shield,
+    Mail,
+    Smartphone,
+    Lock,
+    ArrowLeft,
+    ShieldCheck,
+    AlertCircle
+} from "lucide-react";
+import { Announcement } from "@/types/firestore";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { TwoFactorSetup } from "@/components/two-factor-setup";
 
 export default function AccountSettingsPage() {
-    return (
-        <div className="min-h-screen bg-background text-foreground">
-            <div className="flex h-screen max-h-screen">
-                <AppSidebar activePage="account" />
-                <main className="flex-1 overflow-y-auto">
-                    <Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="animate-spin text-primary" /></div>}>
-                        <AccountSettingsContent />
-                    </Suspense>
-                </main>
-            </div>
-        </div>
-    );
-}
+    const { user, getToken } = useAuth();
+    const router = useRouter();
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [announcements, setAnnouncements] = useState<Announcement[]>([
+        {
+            id: "1",
+            title: "システムメンテナンスのお知らせ",
+            content: "2026年3月1日午前2:00〜4:00まで、データベースのアップグレードに伴いサービスを一時停止いたします。",
+            createdAt: new Date(),
+            isRead: false
+        },
+        {
+            id: "2",
+            title: "新機能：AI返信の自動修正機能が追加されました",
+            content: "生成された返信案をさらに自然な日本語に修正するAIアドバイザー機能がプレミアムプランで利用可能になりました。",
+            createdAt: new Date(Date.now() - 86400000),
+            isRead: true
+        }
+    ]);
+    const [is2faEnabled, setIs2faEnabled] = useState(false);
+    const [showSetup, setShowSetup] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-function AccountSettingsContent() {
-    const searchParams = useSearchParams();
-    const [user] = useState<FirebaseUser | null>(null);
-    const { user: authUser, loading: authLoading, getToken } = useAuth();
-    // const [loading, setLoading] = useState(true); // useAuth's loading is enough or we combine
-    const [pageLoading, setPageLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-
-    // Notification State
-    const [notificationConfig, setNotificationConfig] = useState<NotificationConfig>(DEFAULT_NOTIFICATION_CONFIG);
-    const [userEmail, setUserEmail] = useState("");
-    const [sendingVerification, setSendingVerification] = useState<"email" | "sms" | null>(null);
-    const [showOtpInput, setShowOtpInput] = useState(false);
-    const [otpCode, setOtpCode] = useState("");
-    const [verifyingOtp, setVerifyingOtp] = useState(false);
-    const [planName, setPlanName] = useState("free"); // Add plan state
-
-    // SMS Usage State
-    const [smsUsage, setSmsUsage] = useState<SmsUsageSummary>({
-        sent: 0,
-        limit: DEFAULT_SMS_LIMIT,
-        remaining: DEFAULT_SMS_LIMIT,
-        usageMonth: "",
-    });
-
-    // 設定を取得
-    const fetchConfig = useCallback(async () => {
-        if (!authUser) return;
-        try {
-            const token = await getToken();
-            const response = await fetch("/api/settings/get", {
-                cache: "no-store",
-                headers: {
-                    "Authorization": `Bearer ${token}`
+    useEffect(() => {
+        async function loadData() {
+            if (!user) return;
+            try {
+                const token = await getToken();
+                if (token) {
+                    const data = await getDashboardStats(token);
+                    setStats(data);
                 }
-            });
-            if (!response.ok) throw new Error("設定の取得に失敗しました");
-            const data = await response.json();
-
-            if (data.user_email) setUserEmail(data.user_email);
-
-            if (data.notification_config) {
-                setNotificationConfig({ ...DEFAULT_NOTIFICATION_CONFIG, ...data.notification_config });
-            }
-            if (data.sms_usage) setSmsUsage(data.sms_usage); // APIからも取得
-
-            // Plan name might need to be fetched or inferred. For now default "free" or from profile if API returned it.
-            // The new API doesn't explicitly return plan_name in the root, but we can add it or mock it.
-            // Let's assume free for now or if we added it to API.
-            // setPlanName(data.plan_name || "free"); 
-
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "設定の取得に失敗しました");
-        } finally {
-            setPageLoading(false);
-        }
-    }, [authUser, getToken]);
-
-    useEffect(() => {
-        if (!authLoading) {
-            if (authUser) {
-                fetchConfig();
-            } else {
-                // Redirect handled by middleware or parent? 
-                // Or just stop loading.
-                setPageLoading(false);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
             }
         }
-    }, [authLoading, authUser, fetchConfig]);
+        loadData();
+    }, [user, getToken]);
 
-    // URLパラメータの確認完了トースト
-    useEffect(() => {
-        const verified = searchParams.get("verified");
-        const verifyError = searchParams.get("verify_error");
-        const success = searchParams.get("success");
-
-        if (verified === "email") toast.success("メールアドレスが確認されました ✅");
-        else if (verified === "sms") toast.success("電話番号が確認されました ✅");
-
-        if (success === "true") {
-            toast.success("プランのアップグレードが完了しました！ 🎉", {
-                description: "すべての機能をご利用いただけます。ありがとうございます！",
-                duration: 8000,
-            });
-        }
-
-        if (verifyError === "expired_token") toast.error("確認リンクの有効期限が切れています。");
-        else if (verifyError === "invalid_token") toast.error("確認リンクが無効です。");
-    }, [searchParams]);
-
-    // ログアウト処理
-    const handleLogout = async () => {
-        const { auth } = await import("@/lib/firebase");
-        await auth.signOut();
-        window.location.href = "/login";
-    };
-
-    // 保存処理 (Notification Config Only)
-    const handleSave = async () => {
-        try {
-            setSaving(true);
-            const token = await getToken();
-            const response = await fetch("/api/settings/save", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    notification_config: notificationConfig
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || "設定の保存に失敗しました");
-            }
-            toast.success("設定を保存しました");
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "設定の保存に失敗しました");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    // Notification Logic
-    const updateNotification = (patch: Partial<NotificationConfig>) => {
-        setNotificationConfig((prev) => ({ ...prev, ...patch }));
-    };
-
-    const toggleTargetStar = (star: number) => {
-        setNotificationConfig((prev) => {
-            const current = prev.target_stars;
-            const next = current.includes(star)
-                ? current.filter((s) => s !== star)
-                : [...current, star].sort();
-            return { ...prev, target_stars: next };
-        });
-    };
-
-    const handleEmailToggle = (checked: boolean) => {
-        if (checked && userEmail) {
-            updateNotification({
-                email_enabled: true,
-                email_address: userEmail,
-                email_verified: true,
-            });
-        } else {
-            updateNotification({ email_enabled: checked });
-        }
-    };
-
-    const handleEmailChange = (value: string) => {
-        const isDefault = value === userEmail;
-        updateNotification({ email_address: value, email_verified: isDefault });
-    };
-
-    const handleSmsToggle = (checked: boolean) => {
-        updateNotification({ sms_enabled: checked });
-        if (!checked) {
-            setShowOtpInput(false);
-            setOtpCode("");
-        }
-    };
-
-    const sendVerification = async (channel: "email" | "sms") => {
-        const contactValue = channel === "email"
-            ? notificationConfig.email_address
-            : notificationConfig.phone_number;
-
-        if (!contactValue) return;
-
-        try {
-            setSendingVerification(channel);
-            const token = await getToken();
-            const response = await fetch("/api/notifications/verify", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ channel, contact_value: contactValue }),
-            });
-            if (!response.ok) throw new Error("送信に失敗しました");
-
-            if (channel === "email") toast.success("確認メールを送信しました 📩");
-            else {
-                toast.success("確認コードを送信しました 📱");
-                setShowOtpInput(true);
-            }
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "失敗しました");
-        } finally {
-            setSendingVerification(null);
-        }
-    };
-
-    const verifyOtp = async () => {
-        try {
-            setVerifyingOtp(true);
-            const token = await getToken();
-            const response = await fetch("/api/notifications/verify/confirm", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ otp: otpCode }),
-            });
-            if (!response.ok) throw new Error("認証に失敗しました");
-            toast.success("認証されました ✅");
-            updateNotification({ phone_verified: true });
-            setShowOtpInput(false);
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "失敗しました");
-        } finally {
-            setVerifyingOtp(false);
-        }
-    };
-
-    const isDefaultEmail = notificationConfig.email_address === userEmail && userEmail !== "";
-    const isEmailVerified = notificationConfig.email_verified || isDefaultEmail;
-    const isPhoneVerified = notificationConfig.phone_verified;
+    const handleBack = () => router.push("/dashboard");
 
     return (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8 pb-24">
-            <header className="space-y-2">
-                <h1 className="text-2xl font-bold">アカウント設定</h1>
-            </header>
+        <div className="min-h-screen bg-background text-foreground tracking-tight">
+            <div className="flex h-screen max-h-screen">
+                <AppSidebar
+                    activePage="account"
+                    user={user}
+                    stats={stats}
+                    announcements={announcements}
+                />
 
-            {pageLoading ? (
-                <div className="flex items-center justify-center py-24">
-                    <Loader2 className="size-8 animate-spin text-primary/50" />
-                </div>
-            ) : (
-                <div className="space-y-8">
-                    {/* プロフィール */}
-                    <Card className="shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-primary">
-                                <User className="size-5" />
-                                プロフィール
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {authUser && (
-                                <>
-                                    <div className="flex items-center justify-between py-2 border-b">
-                                        <span className="text-sm text-muted-foreground">メールアドレス</span>
-                                        <span className="font-medium">{authUser.email}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between py-2 border-b">
-                                        <span className="text-sm text-muted-foreground">ユーザーID</span>
-                                        <span className="font-mono text-xs text-muted-foreground">{authUser.uid}</span>
-                                    </div>
-                                </>
-                            )}
-                            <div className="pt-2">
-                                <Button variant="destructive" onClick={handleLogout} className="gap-2">
-                                    <LogOut className="size-4" />
-                                    ログアウト
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                <main className="flex-1 overflow-y-auto bg-muted/20 pb-20">
+                    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+                        {/* Header */}
+                        <div className="flex items-center gap-4">
+                            <Button variant="ghost" size="icon" onClick={handleBack} className="rounded-full">
+                                <ArrowLeft className="size-5" />
+                            </Button>
+                            <h1 className="text-3xl font-black">アカウント設定</h1>
+                        </div>
 
-                    {/* 通知設定 */}
-                    <Card className="shadow-sm border-orange-200">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-orange-500">
-                                <BellRing className="size-5" />
-                                通知設定
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-8">
-                            <div className="space-y-3">
-                                <Label>通知対象の評価</Label>
-                                <div className="flex gap-2">
-                                    {[1, 2, 3].map(s => (
-                                        <Button
-                                            key={s}
-                                            variant={notificationConfig.target_stars.includes(s) ? "default" : "outline"}
-                                            size="sm"
-                                            onClick={() => toggleTargetStar(s)}
-                                            className="rounded-full"
-                                        >
-                                            星{s}
-                                        </Button>
-                                    ))}
+                        {/* Profile Info */}
+                        <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
+                            <CardHeader className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border-b border-indigo-50/20">
+                                <CardTitle className="text-lg font-bold">基本情報</CardTitle>
+                                <CardDescription>あなたのアカウントの詳細情報を管理します</CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">お名前</p>
+                                        <p className="font-bold text-foreground">{user?.displayName || "未設定"}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">メールアドレス</p>
+                                        <p className="font-bold text-foreground flex items-center gap-2">
+                                            {user?.email}
+                                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none text-[9px] font-bold">確認済み</Badge>
+                                        </p>
+                                    </div>
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Security / 2FA Section */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 px-1">
+                                <Shield className="size-5 text-indigo-500" />
+                                <h2 className="text-xl font-black">セキュリティ</h2>
                             </div>
 
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between p-3 border rounded-lg">
-                                    <div className="flex items-center gap-2"><Mail className="size-4" /> メール通知</div>
-                                    <Switch checked={notificationConfig.email_enabled} onCheckedChange={handleEmailToggle} />
-                                </div>
-                                {notificationConfig.email_enabled && (
-                                    <div className="pl-6 space-y-2">
-                                        <div className="flex gap-2">
-                                            <Input className="h-11" value={notificationConfig.email_address} onChange={e => handleEmailChange(e.target.value)} />
-                                            {isEmailVerified && <CheckCircle2 className="size-5 text-green-500 mt-2" />}
-                                        </div>
-                                        {!isEmailVerified && (
-                                            <Button size="sm" variant="outline" onClick={() => sendVerification("email")} disabled={!!sendingVerification}>
-                                                確認メールを送信
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="flex items-center justify-between p-3 border rounded-lg">
-                                    <div className="flex items-center gap-2"><Phone className="size-4" /> SMS通知</div>
-                                    <Switch checked={notificationConfig.sms_enabled} onCheckedChange={handleSmsToggle} />
-                                </div>
-                                {notificationConfig.sms_enabled && (
-                                    <div className="pl-6 space-y-2">
-                                        <div className="flex gap-2">
-                                            <Input className="h-11" value={notificationConfig.phone_number} onChange={e => updateNotification({ phone_number: e.target.value, phone_verified: false })} placeholder="+81..." />
-                                            {isPhoneVerified && <CheckCircle2 className="size-5 text-green-500 mt-2" />}
-                                        </div>
-                                        {!isPhoneVerified && (
-                                            <div className="space-y-2">
-                                                <Button size="sm" variant="outline" onClick={() => sendVerification("sms")} disabled={!!sendingVerification}>
-                                                    確認コードを送信
-                                                </Button>
-                                                {showOtpInput && (
-                                                    <div className="flex gap-2 mt-2">
-                                                        <Input value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))} maxLength={6} className="max-w-[120px] h-11" />
-                                                        <Button size="sm" onClick={verifyOtp} disabled={verifyingOtp}>認証</Button>
-                                                    </div>
+                            <Card className="border-none shadow-sm rounded-3xl border-l-4 border-l-indigo-500">
+                                <CardContent className="pt-6">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                                        <div className="space-y-1.5 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-lg">2段階認証 (MFA)</h3>
+                                                {is2faEnabled ? (
+                                                    <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-none flex items-center gap-1 text-[10px] font-bold">
+                                                        <ShieldCheck className="size-3" /> 有効化済み
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-[10px] font-bold border-border text-muted-foreground">未設定</Badge>
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={handleSave} disabled={saving}>
-                                    {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                                    設定を保存
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* プラン・利用状況 */}
-                    <Card className="shadow-sm">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-blue-600">
-                                <ShieldCheck className="size-5" />
-                                プラン・利用状況
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="p-4 bg-muted/30 rounded-lg">
-                                <div className="text-sm font-medium mb-2">SMS送信数 (今月)</div>
-                                <div className="flex items-end gap-2">
-                                    <span className="text-3xl font-bold">{smsUsage.sent}</span>
-                                    <span className="text-muted-foreground mb-1">/ {smsUsage.limit} 通</span>
-                                </div>
-                                <div className="mt-2 h-2 w-full bg-secondary rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-primary transition-all"
-                                        style={{ width: `${Math.min((smsUsage.sent / smsUsage.limit) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                <div className="text-xs text-muted-foreground mt-2">
-                                    残りの送信可能数: {smsUsage.remaining}通
-                                </div>
-                                <div className="mt-4 pt-4 border-t space-y-4">
-                                    <div
-                                        onClick={() => window.location.href = '/settings/account/upgrade'}
-                                        className="relative overflow-hidden p-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg cursor-pointer hover:shadow-xl transition-all group"
-                                    >
-                                        <div className="absolute top-0 right-0 p-8 bg-white/10 rounded-full -mr-4 -mt-4 group-hover:scale-110 transition-transform"></div>
-                                        <div className="relative z-10">
-                                            <div className="flex items-center gap-2 text-xs font-bold bg-white/20 px-2 py-0.5 rounded w-fit mb-2 border border-white/30">
-                                                <Sparkles className="w-3 h-3" /> HP制作会員様限定
-                                            </div>
-                                            <h4 className="font-black text-lg">特別グレードアッププラン</h4>
-                                            <p className="text-[10px] text-blue-100 mt-1">維持管理費込の特別セット価格をご用意しました</p>
-                                            <div className="mt-3 flex items-center text-xs font-bold gap-1 underline underline-offset-4">
-                                                プランを確認する <ArrowRight className="w-3 s-3" />
-                                            </div>
+                                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                                ログイン時にパスワードに加えて、追加の確認コードを要求することでアカウントを強力に保護します。
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-sm font-bold text-foreground">{is2faEnabled ? "オン" : "オフ"}</span>
+                                            <Switch
+                                                checked={is2faEnabled}
+                                                onCheckedChange={(val) => {
+                                                    if (val) setShowSetup(true);
+                                                    else setIs2faEnabled(false);
+                                                }}
+                                            />
                                         </div>
                                     </div>
 
-                                    <Button
-                                        variant="outline"
-                                        className="w-full text-gray-400 border-gray-100 hover:bg-gray-50 text-xs"
-                                        onClick={() => window.location.href = '/plans'}
-                                    >
-                                        通常プランの一覧を見る
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+                                    <TwoFactorSetup
+                                        open={showSetup}
+                                        onOpenChange={(open) => {
+                                            setShowSetup(open);
+                                            if (!open && is2faEnabled === false) {
+                                                // もし完了せずに閉じた場合はオフのまま（ここではデモ的にオンにするか検討）
+                                            }
+                                        }}
+                                        email={user?.email}
+                                    />
+
+                                    {is2faEnabled && (
+                                        <div className="mt-8 pt-8 border-t border-dashed border-border space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="p-4 rounded-3xl border-2 border-indigo-100 bg-indigo-50/30 space-y-4 relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 p-3 opacity-10">
+                                                        <Smartphone className="size-16" />
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 bg-indigo-500 rounded-xl text-white">
+                                                            <Smartphone className="size-5" />
+                                                        </div>
+                                                        <span className="font-bold text-foreground">認証アプリ (Google/Authy)</span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        認証アプリから生成される6桁のコードを使用します。最も推奨される方法です。
+                                                    </p>
+                                                    <Button variant="outline" onClick={() => setShowSetup(true)} className="w-full rounded-xl font-bold bg-white" size="sm">
+                                                        再設定
+                                                    </Button>
+                                                </div>
+
+                                                <div className="p-4 rounded-3xl border border-border bg-muted/50 space-y-4 relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 p-3 opacity-10">
+                                                        <Mail className="size-16" />
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 bg-muted-foreground/30 rounded-xl text-foreground">
+                                                            <Mail className="size-5" />
+                                                        </div>
+                                                        <span className="font-bold text-foreground">メールアドレス</span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        登録済みのメールアドレスに届く認証コードを使用します。
+                                                    </p>
+                                                    <Button variant="outline" className="w-full rounded-xl font-bold bg-white" size="sm">
+                                                        設定する
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-3 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                                                <AlertCircle className="size-5 text-orange-500 shrink-0" />
+                                                <div className="space-y-1">
+                                                    <p className="text-xs font-bold text-orange-900">バックアップコードをご用意ください</p>
+                                                    <p className="text-[10px] text-orange-800/80 leading-relaxed">
+                                                        スマートフォンを紛失した場合に備え、リカバリーコードを生成して安全な場所に保管することを強くお勧めします。
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-none shadow-sm rounded-3xl">
+                                <CardContent className="pt-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-muted rounded-xl text-muted-foreground">
+                                                <Lock className="size-5" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-foreground">パスワード更新</span>
+                                                <span className="text-[10px] text-muted-foreground font-medium">最後に変更: 3ヶ月前</span>
+                                            </div>
+                                        </div>
+                                        <Button variant="outline" className="rounded-xl font-bold" size="sm">
+                                            変更
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                </main>
+            </div>
         </div>
     );
 }

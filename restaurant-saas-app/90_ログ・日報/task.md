@@ -19,10 +19,38 @@
 - [x] 最終完了報告
 - [x] Standard Planの年払い価格を15%オフ(¥99,960)に改定 [x]
 - [x] 通貨記号（¥）と金額の間に適切な余白を追加し視認性を向上 [x]
-- [x] プラン機能一覧の「XXX PLANの全機能- [x] 販売ページの特定と正確な料金情報の取得 [x]
+- [x] プラン機能一覧の「XXX PLANの全機能
+- [x] **ブランド刷新：プラン名称の全面変更**
+  - [x] `usePlanGuard.ts` の `PLAN_NAMES` 定数置換と正規化ロジック (Done)
+  - [x] `stripe/config.ts` の表示名称（name）置換 (Done)
+  - [x] 指定されたAPIルート（Whop/Instagram等）のプラン識別子同期 (Done)
+  - [x] UI各所の文言置換
+    - [x] `plans/page.tsx` (SaaSプラン) (Done)
+    - [x] `upgrade/page.tsx` (HP制作プラン) (Done)
+    - [x] `CustomerSupportChat.tsx` (チャット回答文) (Done)
+    - [x] `AdminToolbar.tsx` (擬似プラン選択肢) (Done)
+  - [x] ドキュメント・仕様書の刷新
+    - [x] `PRICING_PLANS.md` (内部・外部) (Done)
+    - [x] `Dashboard.md` (内部・外部) (Done)
+    - [x] 日報・タスクトラッカー (Done)
+- [x] 販売ページの特定と正確な料金情報の取得 [x]
 - [x] 実施計画書の作成とユーザー確認依頼 [x]
 - [x] `PRICING_PLANS.md` の更新 [x]
 - [x] `src/app/plans/page.tsx` の更新 [x]
 - [x] `00_経営・戦略/Dashboard.md` の更新 [x]
 - [x] `90_ログ・日報/Task_Tracker.md` の更新 [x]
 - [x] 日報の作成 [x]
+- [x] 日報の作成 [x]
+- [x] 日報の作成 [x]
+- [x] 「プラン選択に戻る」ボタンの改善
+  - [x] デザイン改善案の策定・提案（DESIGN_PROPOSAL.md）
+  - [x] ユーザー要件の確定（2倍サイズ、青色、画像内配置、スクロール追従）
+  - [x] 実装（fixed配置、大型化、カラー変更）
+  - [x] 動作確認
+- [x] プランカード「WEB会員」への機能追加（日替わり自動更新機能搭載の訴求） [plans/page.tsx](file:///c:/Users/SATO/Documents/_ObsidianVault_Hub/restaurant-saas-app/src/app/plans/page.tsx)
+- [x] 指定された文言「日替わり自動更新機能搭載」「更新忘れ防止!! 〜」を適切に改行して実装
+- [x] 全ドキュメントの同期（Task_Tracker, Dashboard, 日報）
+- [x] Geminiモデル別返答品質・コスト検証の実施
+- [x] オーナー指定予算（600円〜3500円）に基づくAI利用上限の再設計
+- [x] AIモデル運用ルール（3 Pro メイン採用）の仕様書への反映
+- [x] 各プランのAIテキスト/画像生成上限の更新

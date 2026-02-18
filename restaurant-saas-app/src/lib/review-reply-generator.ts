@@ -23,12 +23,17 @@ export function buildGeneratorPrompt(params: GenerateReplyParams): string {
   baseText = baseText.replace(/{評価}/g, "★".repeat(starRating));
 
   // 2. 絵文字レベルの指示
-  const emojiInstructions = [
+  let emojiInstructions = [
     "絵文字は一切使用しないでください。",
     "文末に1つか2つ、控えめに絵文字を使用してください。",
     "丁寧な文章の中にも、必ず3〜5個程度の絵文字（😊, ✨, 🍽️など）を交ぜて、親しみやすさを演出してください。",
     "絵文字（😍, 🎉, 💖, 🌈など）を多用（6個以上）し、非常に明るく華やかで感情豊かな文章にしてください。"
   ][config.emoji_level] || "";
+
+  // 1-2星（低評価）の場合は強制的に絵文字を抑える
+  if (starRating <= 2) {
+    emojiInstructions = "お客様を不快にさせないよう、絵文字は一切使わないか、使う場合も文末に1〜2個程度、謝罪や深い反省を表す記号（🙇‍♂️ や 🙇 など）に限定してください。表現スタイル（普通、多め）の設定に関わらず、合計2つ以内を厳守してください。キラキラした絵文字や派手な装飾は厳禁です。";
+  }
 
   // 3. トーンの指示
   const toneInstructions: Record<string, string> = {
@@ -37,25 +42,20 @@ export function buildGeneratorPrompt(params: GenerateReplyParams): string {
     energetic: "活気があり、元気な印象を与えてください。感嘆符（！）を適度に使用し、再来店を強く促してください。"
   };
 
-  // 4. プロンプトの合成（指示の優先順位を考慮）
-  return `
-あなたは飲食店「${config.store_name}」のオーナーです。
-以下の「お客様からの口コミ」に対して、提供された「返信の核となる文章」をベースに、指定された「トーン」と「絵文字レベル」で返信文を作成してください。
+  // 4. プロンプトの合成（指示の密度を高め、トークンを節約）
+  return `あなたは飲食店「${config.store_name}」のオーナーです。
+以下の口コミに対し、返信の核となる文章を基に指定の条件で作成してください。
 
-# 制約事項:
-- 文章トーン: ${toneInstructions[config.ai_tone] || toneInstructions.polite}
-- 絵文字ルール: ${emojiInstructions}
-- 署名: 文末に必ず「${config.default_signature || "店長"}」を含めてください。
-- 禁止事項: 嘘（提供していないサービス、割引など）を勝手に書かないでください。
-- 構造: テンプレートの文章をベースに、指定された絵文字レベルに応じて**必ず絵文字を挿入**し、口コミの内容に具体的に触れて感謝や改善を伝えてください。
+# 条件:
+- 語口: ${toneInstructions[config.ai_tone] || toneInstructions.polite}
+- 絵文字: ${emojiInstructions}
+- 署名: 文末に「${config.default_signature || "店長"}」
+- 禁止: 存在しないメニューや割引への言及は厳禁。
+- 形式: 口コミ具体性に触れつつ、簡潔〜適宜（最大300文字以内）にまとめ、返信本文のみ出力せよ。
 
-# 返信の核となる文章 (テンプレート):
+# 返信の核となる文章:
 ${baseText}
 
-# お客様からの口コミ:
-"${reviewText}"
-
-# 出力形式:
-返信本文のみを出力してください。
-  `.trim();
+# お客様の口コミ:
+"${reviewText}"`.trim();
 }

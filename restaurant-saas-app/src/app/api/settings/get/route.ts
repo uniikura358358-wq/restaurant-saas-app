@@ -25,11 +25,13 @@ const DEFAULT_SETTINGS = {
     ai_tone: "polite",
     default_signature: "",
     emoji_level: 2,
+    auto_reply_delay_minutes: 30, // Default 30 min
     reply_config: { "1": "manual", "2": "manual", "3": "auto", "4": "auto", "5": "auto" },
+    reply_templates: {}, // Empty defaults
     notification_config: DEFAULT_NOTIFICATION_CONFIG,
     sms_limit_override: DEFAULT_SMS_LIMIT,
     sms_usage: { sent: 0, limit: DEFAULT_SMS_LIMIT, remaining: DEFAULT_SMS_LIMIT, usageMonth: "" },
-    ai_usage: { sent: 0, limit: 0, remaining: 0, usageMonth: "" } // explicit default
+    ai_usage: { sent: 0, limit: 0, remaining: 0, usageMonth: "" }
 };
 
 // ... imports ...
@@ -80,9 +82,11 @@ export async function GET(request: Request) {
             store_name: storeData?.storeName ?? "",
             store_area: storeData?.address ?? "",
             ai_tone: storeData?.aiTone ?? "polite",
-            default_signature: storeData?.websiteMaterials?.catchCopy ?? "",
-            emoji_level: 2,
-            reply_config: DEFAULT_SETTINGS.reply_config,
+            default_signature: storeData?.defaultSignature ?? storeData?.websiteMaterials?.catchCopy ?? "",
+            emoji_level: storeData?.emojiLevel ?? 2,
+            auto_reply_delay_minutes: storeData?.autoReplyDelayMinutes ?? 30,
+            reply_config: storeData?.replyConfig ?? DEFAULT_SETTINGS.reply_config,
+            reply_templates: storeData?.replyTemplates ?? {},
             notification_config: storeData?.notificationConfig ?? DEFAULT_NOTIFICATION_CONFIG,
             sms_limit_override: smsLimitOverride,
             sms_usage: smsUsage,

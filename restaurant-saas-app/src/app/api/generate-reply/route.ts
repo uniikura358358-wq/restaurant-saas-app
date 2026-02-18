@@ -80,16 +80,41 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "starRating は 1〜5 で指定してください" }, { status: 400 });
         }
 
+        // --- 1. キャッシュチェック (無駄な再生成を防止) ---
+        if (reviewId && adminDb) {
+            try {
+                const cacheRef = adminDb.collection("stores").doc(userId).collection("ai_cache").doc(reviewId);
+                const cacheDoc = await cacheRef.get();
+                if (cacheDoc.exists) {
+                    const cacheData = cacheDoc.data();
+                    // 24時間以内のキャッシュがあれば再利用（UXを損なわず原価をゼロにする）
+                    const createdAt = cacheData?.createdAt?.toMillis ? cacheData.createdAt.toMillis() : 0;
+                    const isRecent = Date.now() - createdAt < 24 * 60 * 60 * 1000;
+
+                    if (isRecent && cacheData?.reply) {
+                        return NextResponse.json({
+                            reply: cacheData.reply,
+                            isCached: true
+                        });
+                    }
+                }
+            } catch (cacheError) {
+                console.warn("Cache fetch error (ignoring and proceeding with AI):", cacheError);
+            }
+        }
+
         const truncatedReviewText = reviewText.slice(0, MAX_REVIEW_TEXT_LENGTH);
 
-        // Vertex AI 移行 (規則: Main: 3-flash-preview, Sub: 2.5-flash)
-        const targetModels = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+        // Vertex AI 移行 (Smart Routing 有効化)
+        // gemini-3-pro-preview を指定すると、getGenerativeModel 内で文脈に応じ Flash へ自動切替される
+        const targetModels = ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash'];
         let responseText: string | null = null;
         let lastError: unknown = null;
 
         for (const modelName of targetModels) {
             try {
-                const model = getGenerativeModel(modelName);
+                // 第3引数にテキストを渡すことで、内部でコスト最適化ルーティングが実行される
+                const model = getGenerativeModel(modelName, false, truncatedReviewText);
                 const prompt = buildGeneratorPrompt({
                     reviewText: truncatedReviewText,
                     starRating,
@@ -132,14 +157,22 @@ export async function POST(request: Request) {
             );
         }
 
-        // Firestore クォータのインクリメント (円ベースの内部予算を減算)
-        try {
-            await incrementAiUsage(userId, 'text');
-        } catch (dbError) {
-            console.error("Firestore quota update failed:", dbError);
-        }
+        // クォータのインクリメントは送信時（submit-reply）に変更するため、ここでは削除
 
-        const sanitizedReply = sanitizeAiOutput(responseText);
+        const sanitizedReply = sanitizeAiOutput(responseText, starRating);
+
+        // --- 2. 成功時にキャッシュ保存 (次回の同一リクエストに備える) ---
+        if (reviewId && adminDb) {
+            try {
+                await adminDb.collection("stores").doc(userId).collection("ai_cache").doc(reviewId).set({
+                    reply: sanitizedReply,
+                    createdAt: new Date(),
+                    userId // 誰が生成したか
+                });
+            } catch (saveCacheError) {
+                console.warn("Cache save error:", saveCacheError);
+            }
+        }
 
         return NextResponse.json(
             { reply: sanitizedReply },

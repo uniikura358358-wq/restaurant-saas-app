@@ -26,7 +26,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "ユーザー情報が見つかりません" }, { status: 404 });
         }
         const userData = userDoc.data();
-        const userPlan = (userData?.plan || 'Free').toLowerCase();
+        const userPlan = (userData?.plan || 'WEB会員').toLowerCase();
 
         if (!ALLOWED_PLANS.includes(userPlan)) {
             return NextResponse.json({

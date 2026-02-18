@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MessageSquare, X, Send, Bot, User } from 'lucide-react';
@@ -17,7 +18,8 @@ type ScenarioStep = {
 // 混雑状況フラグ（ここをtrueにすると全ユーザーに長めの納期を案内します）
 const IS_BUSY_MODE = false;
 
-const SCENARIO: Record<string, ScenarioStep> = {
+// --- 販売用シナリオ (Prospects) ---
+const SCENARIO_SALES: Record<string, ScenarioStep> = {
     start: {
         id: 'start',
         botMessage: 'こんにちは！AIサポートアシスタントです。本日はどのようなご用件でしょうか？',
@@ -31,7 +33,7 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     faq_features_all: {
         id: 'faq_features_all',
-        botMessage: '全プランの主な機能一覧をご説明します！\n\n【Lightプラン】\n・Google口コミ自動返信代行\n・低評価通知 / 炎上防止\n・MEO集客支援\n\n【Standardプラン】\n上記の全機能に加えて…\n・Instagram自動投稿支援\n・AI画像生成 (60枚/月)\n・リピーター獲得SNS強化\n\n【Premiumプラン】\n最上位の全機能として…\n・AI売上・経営データ分析\n・POP/メニューAI自動作成\n・ライバル店AI監視 (5店舗)\n\n特に気になる機能はございますか？',
+        botMessage: '全プランの主な機能一覧をご説明します！\n\n【Standard】\n・Google口コミ返信案の作成 (400回/月)\n・AI画像生成 (50枚/月)\n・低評価通知 / 炎上防止\n・MEO集客支援\n\n【Pro】\n上記の全機能に加えて…\n・AIテキスト生成合計 (1,000回/月)\n・Instagram自動投稿支援\n・AI画像生成 (200枚/月)\n・AIにおまかせ日替わりスケジュール表示\n\n【Pro Premium】\n最上位の全機能として…\n・AIテキスト生成合計 (1,700回/月)\n・AI売上・経営データ分析\n・AI画像生成 (450枚/月)\n・POP/メニューAI自動作成\n・ライバル店AI監視 (5店舗)\n\n特に気になる機能はございますか？',
         options: [
             { label: 'Google口コミ返信', nextStep: 'tool_gmap' },
             { label: 'Instagram自動投稿', nextStep: 'tool_insta' },
@@ -39,7 +41,6 @@ const SCENARIO: Record<string, ScenarioStep> = {
             { label: '料金プランを見る', nextStep: 'faq_plans_select' }
         ]
     },
-    // AI Tools (SaaS Only) Scenario
     ai_tools_intro: {
         id: 'ai_tools_intro',
         botMessage: '集客に特化した自動AIサービスですね！\nこちらは、すでにHPをお持ちの方や、Google/SNSでの集客を真っ先に強化したいオーナー様に最適です。\n\n具体的にどの機能にご興味がありますか？',
@@ -60,7 +61,7 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     tool_insta: {
         id: 'tool_insta',
-        botMessage: 'Instagram投稿の「ネタ探し・文章作成・ハッシュタグ選び」をAIがサポートします。\n\nスマホで撮った写真をアップするだけで、AIが魅力的な投稿文を生成。営業の合間にサクッと発信を継続でき、新規客やリピーターの獲得に繋げます。\n※Standardプラン以上でご利用いただけます。',
+        botMessage: 'Instagram投稿の「ネタ探し・文章作成・ハッシュタグ選び」をAIがサポートします。\n\nスマホで撮った写真をアップするだけで、AIが魅力的な投稿文を生成。営業の合間にサクッと発信を継続でき、新規客やリピーターの獲得に繋げます。\n※Proプラン以上でご利用いただけます。',
         options: [
             { label: '他の機能も見る', nextStep: 'ai_tools_intro' },
             { label: '料金プランを見る', nextStep: 'faq_plans_select' }
@@ -74,7 +75,6 @@ const SCENARIO: Record<string, ScenarioStep> = {
             { label: '料金プランを見る', nextStep: 'faq_plans_select' }
         ]
     },
-    // HP Production Scenario
     hp_intro: {
         id: 'hp_intro',
         botMessage: 'HP制作ですね、ありがとうございます！\n初期費用 ¥39,800 で、プロ品質の公式Webサイトを制作し、ドメイン・サーバーの維持管理まで丸投げいただけます。\n\nより良い制作のために、いくつか質問させてください。まず、お店の【店内画像】はお手元にご用意ございますか？',
@@ -204,7 +204,7 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     hp_price_explanation: {
         id: 'hp_price_explanation',
-        botMessage: '料金の詳細です。\n\n【HP制作パッケージ】\n◆ 初期制作費： **39,800円** (初回のみ)\n◆ 月額（維持費込）： **3,280円〜**\n\n【集客AI特化サービス (HPなし)】\n◆ 初期費用： **0円**\n◆ 月額： **3,980円〜**\n\n※Standard（月額9,800円）以上のプランなら、HPを制作した場合も **HP維持費はすべて月額料金に含まれる（実質無料）** ため、大変お得です！',
+        botMessage: '料金の詳細です。\n\n【HP制作パッケージ】\n◆ 初期制作費： **39,800円** (初回のみ)\n◆ 月額（維持費込）： **3,280円〜** (web Light)\n\n【集客AI特化サービス (HPなし)】\n◆ 初期費用： **0円**\n◆ 月額： **3,980円〜** (Standard)\n\n※Pro（月額9,800円）以上のプランなら、HPを制作した場合も **HP維持費はすべて月額料金に含まれる（実質無料）** ため、大変お得です！',
         options: [
             { label: 'よくわかりました', nextStep: 'hp_final_check' }
         ]
@@ -224,7 +224,7 @@ const SCENARIO: Record<string, ScenarioStep> = {
     },
     faq_plans_select: {
         id: 'faq_plans_select',
-        botMessage: '料金プランの違いについてですね。\n\n◆ **Light (3,980円)**: Google口コミ自動返信・MEO対策。新規客の信頼獲得に。\n◆ **Standard (9,800円)**: ＋Instagram自動投稿。リピーターを増やしたい人気店に。\n◆ **Premium (14,800円)**: 全機能 ＋AI売上分析・経営相談。売上最大化を目指すオーナー様へ。\n\n※いずれのプランも年払いで **最大17%お得** になります！',
+        botMessage: '料金プランの違いについてですね。\n\n◆ **Standard (3,980円)**: Google口コミ返信(400回)・画像生成(50枚)。\n◆ **Pro (9,800円)**: オススメ！プラン。＋Instagram投稿支援・テキスト生成合計(1,000回)・画像生成(200枚)。\n◆ **Pro Premium (14,800円)**: 全機能 ＋AI売上分析・経営相談・テキスト生成合計(1,700回)・画像生成(450枚)。\n\n※いずれのプランも年払いで **最大17%（約2ヶ月分）お得** になります！',
         options: [
             { label: '集客機能について詳しく', nextStep: 'ai_tools_intro' },
             { label: 'HP制作との同時契約は？', nextStep: 'hp_price_explanation' },
@@ -247,6 +247,129 @@ const SCENARIO: Record<string, ScenarioStep> = {
     }
 };
 
+// --- 会員用シナリオ (Members/Admin) ---
+const SCENARIO_MEMBER: Record<string, ScenarioStep> = {
+    start: {
+        id: 'start',
+        botMessage: 'ご利用ありがとうございます！AIサポートです。管理画面の操作や設定方法についてお手伝いしましょうか？',
+        options: [
+            { label: 'Google口コミAIの使い方を知りたい', nextStep: 'member_google_guide' },
+            { label: 'Instagram連携を始めたい', nextStep: 'member_insta_guide' },
+            { label: '店舗名やAIの口調を変えたい', nextStep: 'member_settings_guide' },
+            { label: '売上が上がるテクニック集', nextStep: 'member_revenue_tips' },
+            { label: 'HPの使い方ガイド（画像・メニュー更新）', nextStep: 'member_hp_guide' },
+            { label: 'プラン変更・お支払いについて', nextStep: 'member_billing_guide' },
+            { label: '口コミが同期されない・エラーが出る', nextStep: 'member_trouble' }
+        ]
+    },
+    member_google_guide: {
+        id: 'member_google_guide',
+        botMessage: 'Google口コミAIでは、「返信案の作成」と「自動返信」の2つの使い方ができます。\n\n1. **返信案の作成**: ダッシュボードの「未返信」タブから口コミを選び、「AI返信案を作成」を押してください。\n2. **自動返信**: 店舗設定の「Google口コミ」タブで「自動返信」を有効にすると、AIが自動で返信するようになります。',
+        options: [
+            { label: '自動返信の設定場所は？', nextStep: 'member_settings_guide' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    member_insta_guide: {
+        id: 'member_insta_guide',
+        botMessage: 'Instagram連携（Proプラン以上）では、AIが投稿文やハッシュタグを自動生成します。\n\n店舗設定の「Instagram」タブからアカウントを連携してください。連携後は、写真をアップロードするだけでAIが魅力的な投稿案を作成します！',
+        options: [
+            { label: '自分のプランを確認する', nextStep: 'member_billing_guide' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    member_settings_guide: {
+        id: 'member_settings_guide',
+        botMessage: '店舗情報の変更やAIのキャラクター設定は、「店舗設定」メニューから行えます。\n\n・**基本情報**: 店舗名や署名（店長、オーナー等）\n・**AIトーン**: 丁寧、フレンドリー、元気などの使い分け\n・**返信テンプレート**: 星の数に応じたベース文章の編集\n\n左メニューの「店舗設定」をクリックしてください。',
+        options: [
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    member_billing_guide: {
+        id: 'member_billing_guide',
+        botMessage: '現在のプラン確認やアップグレードは「プラン一覧」ページから行えます。\n領収書の発行や支払い情報の変更（Stripe）についても、プラン一覧から管理画面にアクセスいただけます。',
+        options: [
+            { label: 'プラン一覧ページへ', nextStep: 'action_open_plans' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    member_trouble: {
+        id: 'member_trouble',
+        botMessage: 'ご不便をおかけしております。\n\n・**同期されない**: ダッシュボードの「口コミを同期」ボタンを試してください。\n・**ログインエラー**: 一度ログアウトし、再度ログインをお試しください。\n・**AIが動かない**: 今月の利用枠を使い切っていないか「プラン一覧」でご確認ください。\n\n解決しない場合は、近日中に設置予定のサポート窓口までご連絡をお願いいたします。',
+        options: [
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    member_revenue_tips: {
+        id: 'member_revenue_tips',
+        botMessage: 'MogMogを「単なる作業効率化」ではなく「売上を伸ばす武器」として使うためのテクニック集です！\n\n具体的にどの分野の集客・売上アップに興味がありますか？',
+        options: [
+            { label: 'Google口コミで新規客を増やす', nextStep: 'tip_google_seo' },
+            { label: 'Instagramで「行きたい」を作る', nextStep: 'tip_insta_branding' },
+            { label: 'AIトーンで常連さんを増やす', nextStep: 'tip_tone_loyalty' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    tip_google_seo: {
+        id: 'tip_google_seo',
+        botMessage: 'Googleマップで上位に表示され、新規客を増やすコツは「返信の速さ」と「キーワード」です。\n\n1. **返信スピード**: AI自動返信を「10分〜12時間」以内に設定しましょう。Googleはアクティブな店を優先します。\n2. **キーワード**: AIは返信文に「お店の売り」を自然に盛り込みます。これにより、検索でヒットしやすくなります。\n3. **誠実さ**: 低評価にもAIが即座に誠実な返信案を作るので、炎上を防ぎつつ信頼を勝ち取れます。',
+        options: [
+            { label: '他のテクニックも見る', nextStep: 'member_revenue_tips' },
+            { label: '自動返信の設定へ', nextStep: 'member_google_guide' }
+        ]
+    },
+    tip_insta_branding: {
+        id: 'tip_insta_branding',
+        botMessage: 'Instagramの成功法則は「接触頻度」です。AIを使えば毎日5分でプロ級の投稿ができます。\n\n1. **毎日投稿**: AIが日替わりで投稿文を作るので、フォロワーの目に留まる機会が最大化されます。\n2. **シズル感のある文章**: AIが「食べてみたい！」と思わせる魅力的なフレーズを提案します。\n3. **ハッシュタグ戦略**: 最適なハッシュタグをAIが自動選定。検索からの流入を逃しません。',
+        options: [
+            { label: '他のテクニックも見る', nextStep: 'member_revenue_tips' },
+            { label: 'Instagram連携ガイド', nextStep: 'member_insta_guide' }
+        ]
+    },
+    tip_tone_loyalty: {
+        id: 'tip_tone_loyalty',
+        botMessage: '「お店のファン」を作るには、返信の「口調」が重要です。\n\n1. **キャラクター設定**: AIトーンを「フレンドリー」や「元気」に設定し、お店の雰囲気を伝えましょう。\n2. **署名機能**: 返信の末尾に「店長 ●●より」と名前を出すだけで、お客様の親近感が一気に高まります。\n3. **パーソナライズ**: AIがお客様の口コミ内容に寄り添った回答をするため、「大切にされている」と感じたお客様のリピート率が上がります。',
+        options: [
+            { label: '他のテクニックも見る', nextStep: 'member_revenue_tips' },
+            { label: 'AIトーンの設定場所は？', nextStep: 'member_settings_guide' }
+        ]
+    },
+    member_hp_guide: {
+        id: 'member_hp_guide',
+        botMessage: 'WEB会員様向け：HP更新ガイドへようこそ！\nお客様を「おっ！」と思わせるHPにするための、簡単な更新方法をレクチャーします。\n\nどの更新方法について知りたいですか？',
+        options: [
+            { label: '料理や店内の写真をアップしたい', nextStep: 'hp_step_image' },
+            { label: 'メニュー名や価格を変えたい', nextStep: 'hp_step_menu' },
+            { label: '今日の日替わりメニューを載せたい', nextStep: 'hp_step_daily' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    hp_step_image: {
+        id: 'hp_step_image',
+        botMessage: '画像のアップロードはとっても簡単です！\n\n1. 左メニューの「コンテンツ管理」または各メニューの編集画面を開きます。\n2. 「画像を選択」ボタンを押し、スマホやPCから写真を選びます。\n3. **コツ**: 「1:1（正方形）」で撮影した写真を使うと、HPのレイアウトにぴったり収まり、プロ並みの仕上がりになります！',
+        options: [
+            { label: 'メニューの更新方法も見る', nextStep: 'hp_step_menu' },
+            { label: '他も見る', nextStep: 'member_hp_guide' }
+        ]
+    },
+    hp_step_menu: {
+        id: 'hp_step_menu',
+        botMessage: 'メニューの更新手順はこちらです。\n\n1. 左メニューの「メニュー管理」をクリックします。\n2. 変更したいメニューの「編集」ボタンを押します。\n3. 名前や価格を書き換えて「保存」するだけで、HPに即座に反映されます。\n\n新メニューを追加したときは、魅力的な写真も忘れずにセットしてくださいね！',
+        options: [
+            { label: '画像のコツを見る', nextStep: 'hp_step_image' },
+            { label: '他も見る', nextStep: 'member_hp_guide' }
+        ]
+    },
+    hp_step_daily: {
+        id: 'hp_step_daily',
+        botMessage: '「日替わりメニュー」は一番人気の集客機能です！\n\n1. ダッシュボードの「日替わりメニュー更新」欄に、今日の内容を入力します。\n2. 「AIでHPを更新」ボタンを押すと、AIがおいしそうなキャッチコピーを自動生成してHPを書き換えます。\n\n毎日更新することで、お客様に「このお店はいつも活気があるな」と伝えることができますよ。',
+        options: [
+            { label: '売上を上げるコツを見る', nextStep: 'member_revenue_tips' },
+            { label: '他も見る', nextStep: 'member_hp_guide' }
+        ]
+    }
+};
+
 type Message = {
     id: string;
     text: string;
@@ -256,16 +379,27 @@ type Message = {
 };
 
 export function CustomerSupportChat() {
+    const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: 'welcome',
-            text: SCENARIO.start.botMessage,
-            sender: 'bot',
-            timestamp: new Date(),
-            options: SCENARIO.start.options
+
+    // Determines which scenario to use based on the current path
+    const isAdminPath = pathname.startsWith('/dashboard') || pathname.startsWith('/settings') || pathname.startsWith('/tools');
+    const SCENARIO = isAdminPath ? SCENARIO_MEMBER : SCENARIO_SALES;
+
+    const [messages, setMessages] = useState<Message[]>([]);
+
+    // Initialize messages based on current scenario
+    useEffect(() => {
+        if (messages.length === 0) {
+            setMessages([{
+                id: 'welcome',
+                text: SCENARIO.start.botMessage,
+                sender: 'bot',
+                timestamp: new Date(),
+                options: SCENARIO.start.options
+            }]);
         }
-    ]);
+    }, [SCENARIO]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -397,16 +531,45 @@ export function CustomerSupportChat() {
             let botResponse = "申し訳ありません。その質問にはまだ正確にお答えできませんが、AIが学習を進めております。お急ぎの場合は、今後お知らせする専用メールアドレスへのお問い合わせも可能です。";
             let nextOptions = SCENARIO.start.options;
 
-            // Simple Keyword Matching
+            // Simple Keyword Matching (Scenario-Aware)
             if (lowerText.includes('機能') || lowerText.includes('できること')) {
-                botResponse = SCENARIO.faq_features_all.botMessage;
-                nextOptions = SCENARIO.faq_features_all.options;
+                if (isAdminPath) {
+                    botResponse = "管理画面では、Google口コミの自動返信、Instagramの投稿作成支援、店舗情報の管理などがご利用いただけます。具体的な使い方はメニューからお選びください。";
+                    nextOptions = SCENARIO_MEMBER.start.options;
+                } else {
+                    botResponse = SCENARIO_SALES.faq_features_all.botMessage;
+                    nextOptions = SCENARIO_SALES.faq_features_all.options;
+                }
             } else if (lowerText.includes('料金') || lowerText.includes('値段') || lowerText.includes('プラン')) {
-                botResponse = SCENARIO.faq_plans_select.botMessage;
-                nextOptions = SCENARIO.faq_plans_select.options;
+                const stepKey = isAdminPath ? 'member_billing_guide' : 'faq_plans_select';
+                const step = SCENARIO[stepKey];
+                if (step) {
+                    botResponse = step.botMessage;
+                    nextOptions = step.options;
+                }
             } else if (lowerText.includes('hp') || lowerText.includes('制作')) {
-                botResponse = SCENARIO.hp_intro.botMessage;
-                nextOptions = SCENARIO.hp_intro.options;
+                if (isAdminPath) {
+                    botResponse = "会員様向けのHP編集機能や追加修正については、現在準備中です。恐れ入りますが、管理画面内の公式LINEから直接お問い合わせください。";
+                    nextOptions = SCENARIO_MEMBER.start.options;
+                } else {
+                    botResponse = SCENARIO_SALES.hp_intro.botMessage;
+                    nextOptions = SCENARIO_SALES.hp_intro.options;
+                }
+            } else if (isAdminPath && (lowerText.includes('口コミ') || lowerText.includes('返信'))) {
+                botResponse = SCENARIO_MEMBER.member_google_guide.botMessage;
+                nextOptions = SCENARIO_MEMBER.member_google_guide.options;
+            } else if (isAdminPath && (lowerText.includes('インスタ') || lowerText.includes('insta'))) {
+                botResponse = SCENARIO_MEMBER.member_insta_guide.botMessage;
+                nextOptions = SCENARIO_MEMBER.member_insta_guide.options;
+            } else if (isAdminPath && (lowerText.includes('設定') || lowerText.includes('キャラクター') || lowerText.includes('口調'))) {
+                botResponse = SCENARIO_MEMBER.member_settings_guide.botMessage;
+                nextOptions = SCENARIO_MEMBER.member_settings_guide.options;
+            } else if (isAdminPath && (lowerText.includes('売上') || lowerText.includes('集客') || lowerText.includes('コツ') || lowerText.includes('テクニック'))) {
+                botResponse = SCENARIO_MEMBER.member_revenue_tips.botMessage;
+                nextOptions = SCENARIO_MEMBER.member_revenue_tips.options;
+            } else if (isAdminPath && (lowerText.includes('hp') || lowerText.includes('更新') || lowerText.includes('メニュー') || lowerText.includes('画像'))) {
+                botResponse = SCENARIO_MEMBER.member_hp_guide.botMessage;
+                nextOptions = SCENARIO_MEMBER.member_hp_guide.options;
             }
 
             const botMsg: Message = {

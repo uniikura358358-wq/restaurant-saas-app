@@ -51,7 +51,7 @@
 - データベースの正：Cloud Firestore
 - サーバー権限：Firebase Admin SDK（サーバー専用）
 - 課金の正：Stripe（Webhook → Firestore更新）
-- 仕様の正：10_進行中プロジェクト
+- 仕様の正：10_進行中プロジェクト / 00_経営・戦略/PRICING_PLANS.md (販売ページ page.tsx と完全同期済み)
 - タスク管理の正：90_ログ・日報/Task_Tracker.md
 
 Supabaseによる認証・保存は禁止。

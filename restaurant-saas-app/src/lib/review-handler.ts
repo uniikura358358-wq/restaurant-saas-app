@@ -69,19 +69,35 @@ const DEFAULT_REPLY_CONFIG: ReplyConfig = {
  * Unicode絵文字を正規表現で検出・除去する
  * 対象: 一般的な絵文字範囲（Emoji_Presentation + Emoji_Modifier等）
  */
-const EMOJI_REGEX = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
+/**
+ * Unicode絵文字を正規表現で検出・除去する
+ * 対象: 一般的な絵文字範囲 + ZWJシーケンス
+ */
+const EMOJI_REGEX = /(\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(\u200D(\p{Emoji_Presentation}|\p{Emoji}\uFE0F))*/gu;
 
 /**
- * 星2以下の返信文から絵文字を強制除去する
- * ビジネスルール: 低評価への返信に絵文字は不適切
+ * 星2以下の返信文から絵文字を制限する
+ * ビジネスルール: 低評価への返信に絵文字は不適切（または最小限に留めるべき）
  * 
  * @param text - AI生成の返信文
  * @param rating - 口コミの星数（1〜5）
- * @returns 絵文字除去後のテキスト
+ * @returns 絵文字制限後のテキスト
  */
 export function sanitizeEmoji(text: string, rating: number): string {
     if (rating <= 2) {
-        return text.replace(EMOJI_REGEX, "").replace(/\s{2,}/g, " ").trim();
+        // 絵文字（ZWJシーケンスを含む）を抽出
+        // 🙇‍♂️ などの複雑な絵文字を一つの塊としてマッチさせる
+        const emojiMatches = text.match(EMOJI_REGEX) || [];
+
+        if (emojiMatches.length > 2) {
+            // 3個目以降の絵文字を置換対象にする
+            // 複雑な絵文字が途中で切れないよう、出現回数ベースで制御するルーター型置換
+            let count = 0;
+            return text.replace(EMOJI_REGEX, (match) => {
+                count++;
+                return count <= 2 ? match : "";
+            }).replace(/\s{2,}/g, " ").trim();
+        }
     }
     return text;
 }
@@ -102,14 +118,20 @@ const NOISE_PATTERNS: RegExp[] = [
 ];
 
 /**
- * AI出力から不要なメタ情報・ノイズを除去する
+ * AI出力から不要なメタ情報・ノイズを除去し、絵文字制限を適用する
  * 
  * @param text - AI生成の返信文
+ * @param rating - 口コミの星数（絵文字制限用）
  * @param maxLength - 最大文字数（超過時は末尾を省略）
  * @returns 整形後のテキスト
  */
-export function sanitizeAiOutput(text: string, maxLength: number = 500): string {
+export function sanitizeAiOutput(text: string, rating?: number, maxLength: number = 500): string {
     let cleaned = text;
+
+    // 絵文字制限の適用
+    if (rating !== undefined) {
+        cleaned = sanitizeEmoji(cleaned, rating);
+    }
 
     // ノイズパターンを順次除去
     for (const pattern of NOISE_PATTERNS) {

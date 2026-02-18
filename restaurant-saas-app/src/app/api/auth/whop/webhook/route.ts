@@ -66,13 +66,13 @@ export async function POST(request: Request) {
                 const isBusiness = product_id === process.env.WHOP_PRODUCT_ID_BUSINESS;
                 const isLight = product_id === process.env.WHOP_PRODUCT_ID_LIGHT;
 
-                const planStatus = status === 'active' ? 'active' : 'free';
-                const planName = status === 'active' ? (isBusiness ? 'Business' : (isLight ? 'Light' : 'Free')) : 'Free';
+                const planStatus = status === 'active' ? 'active' : 'web light';
+                const planName = status === 'active' ? (isBusiness ? 'Business' : (isLight ? 'Light' : 'web Light')) : 'web Light';
 
                 // Update Firestore Profile
                 try {
                     await adminDb.collection('users').doc(uid).set({
-                        plan: planName.toLowerCase(), // 'business' | 'light' | 'free'
+                        plan: planName.toLowerCase(), // 'business' | 'light' | 'web light'
                         subscriptionStatus: planStatus,
                         planName: planName,
                         updatedAt: FieldValue.serverTimestamp()

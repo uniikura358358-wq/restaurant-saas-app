@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 
 interface ReviewReplyButtonProps {
     reviewText: string;
@@ -23,6 +24,7 @@ export default function ReviewReplyButton({
 }: ReviewReplyButtonProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
     const { getToken } = useAuth();
 
     const handleGenerate = async () => {
@@ -31,6 +33,7 @@ export default function ReviewReplyButton({
 
         setIsGenerating(true);
         setError(null);
+        setSuccess(null);
 
         try {
             // 2. APIリクエスト (Gemini 3 Flash -> 2.5 Flash)
@@ -96,6 +99,8 @@ export default function ReviewReplyButton({
 
             // 3. 結果の検証と引渡し
             if (data.reply) {
+                setSuccess("返信案を作成しました！");
+                setTimeout(() => setSuccess(null), 3000);
                 onReplyGenerated(data.reply);
             } else {
                 throw new Error('AIからの応答が空でした。');
@@ -111,23 +116,36 @@ export default function ReviewReplyButton({
     };
 
     return (
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2 relative">
+            {/* 成功メッセージ通知 (ボタンのすぐ上に配置) */}
+            {success && (
+                <div className="absolute bottom-full right-0 mb-3 animate-in fade-in slide-in-from-bottom-2 duration-500 z-50">
+                    <div className="bg-card border border-primary/20 px-4 py-2 rounded-xl shadow-lg flex items-center gap-2.5 whitespace-nowrap">
+                        <div className="bg-primary rounded-full p-1">
+                            <Sparkles className="size-3 text-white" />
+                        </div>
+                        <span className="text-xs font-bold text-foreground">{success}</span>
+                    </div>
+                </div>
+            )}
+
             <Button
                 onClick={handleGenerate}
                 disabled={isGenerating || !reviewText}
-                size="sm"
-                className={`gap-2 ${className}`}
-            // ユーザー指定のデザインに寄せるか、プロジェクトのテーマに合わせるか。
-            // プロジェクトテーマ(Canvas UI)に合わせるのがベスト。
+                className={cn(
+                    "h-12 px-6 rounded-xl gap-2 font-bold shadow-sm transition-all active:scale-95",
+                    "bg-primary hover:bg-primary/90 text-white",
+                    className
+                )}
             >
                 {isGenerating ? (
                     <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-5 h-5 animate-spin" />
                         生成中...
                     </>
                 ) : (
                     <>
-                        <Sparkles className="w-4 h-4" />
+                        <Sparkles className="w-5 h-5" />
                         AI返信案を作成
                     </>
                 )}
@@ -135,7 +153,7 @@ export default function ReviewReplyButton({
 
             {/* エラー表示エリア */}
             {error && (
-                <span className="text-xs text-destructive font-semibold flex items-center gap-1">
+                <span className="text-xs text-destructive font-semibold flex items-center gap-1 bg-destructive/10 px-3 py-1 rounded-lg border border-destructive/20 animate-in fade-in slide-in-from-top-1 shadow-sm mt-1">
                     <AlertCircle className="w-3 h-3" />
                     {error}
                 </span>

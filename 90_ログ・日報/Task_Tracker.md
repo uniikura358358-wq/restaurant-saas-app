@@ -1,0 +1,56 @@
+# Firebase Unification Tasks (Final Plan)
+
+- [x] 動作確認・検証
+  - [x] 認証エラーの有無確認 (ビルド通過・静的解析)
+  - [x] 応答生成の確認 (コード整合性確認)
+  - [x] UI連携時の認証エラー修正
+  - [x] 重複コンポーネント (PascalCaseファイル) の削除
+- [x] 日報・ダッシュボード更新
+  - [x] `Dashboard.md` の更新
+  - [x] 日報の作成
+- [x] 依存関係のセットアップ
+  - [x] `@google-cloud/vertexai` のインストール 初期化エラー抑制
+  - [x] 管理者コンソールの操作性改善 (ドラッグ、Premium対応、タイポ修正)
+- [x] Instagram連携のラベリング・配置修正、およびStandardプランUIの磨き込み (完了)
+  - [x] `lib/instagram-client.ts` の実装
+  - [x] `api/instagram/post` エンドポイントの実装
+  - [x] UI 側への「Instagram 投稿」ボタン追加とプラン制限の構築
+  - [x] 実機投稿テストとエラーハンドリング調整
+
+- [x] **Phase 0: Safety & Inventory** `[x]`
+  - [x] 環境変数チェック (`src/lib/check-env.ts`)
+  - [x] データ台帳 (`Data_Inventory.md`)
+- [x] **Phase 1: Auth Boundary** `[x]`
+  - [x] `useAuth` の厳格化と `storeId` 取得の共通化
+  - [x] Server Side Auth Verification (`verifyIdToken`) の実装
+  - [x] `submit-reply` API の認証を Firebase Auth に変更
+- [x] **Phase 2: Data Unification (Firestore Migration)** `[x]`
+  - [x] **Stats Design**: `tenants/{id}/stats` スキーマ定義
+  - [x] **Dashboard Updates**: `DashboardStats` を用いた集計表示への移行
+  - [x] `src/app/dashboard/page.tsx` を Firestore Admin SDK 読み取りに変更
+- [x] **Phase 5: AI Cost Control & Governance** `[x]`
+  - [x] **Cost Tracking**: `ai-quota.ts` を「回数」から「予算（円）＋回数」の二重管理に移行
+  - [x] **Safety Guard**: `ESTIMATED_COST_PER_TEXT_CALL_YEN` によるリアルタイム予算減算の実装
+  - [x] **Isolation**: 画像生成（高コスト）とテキスト生成（低コスト）のクォータ物理分離
+  - [x] **永続化**: `.cursorrules` & `AI_MODEL_STANDARDS.md` への機密ルール追記
+- [x] **Phase 3: API Reliability** `[x]`
+  - [x] **Idempotency**: `requests/{requestId}` コレクションと `X-Request-ID` によるチェック実装
+  - [x] **Transaction**: `submit-reply` APIに「Stats更新 + 冪等性チェック」を完全実装
+  - [x] **Validation**: 返信文字数制限(300文字)と入力値検証の強化
+- [x] **Phase 4: Optimization & Cleanup** `[x]`
+  - [x] **Build Fix**: `firebase-admin.ts` の環境変数パース堅牢化と API ルートの静的生成エラー解消
+  - [x] **Supabaseクリーンアップ**: Supabase関連コード、パッケージ、環境設定の完全削除
+  - [x] **資産化**: `10_進行中プロジェクト` & `20_開発ノウハウ` への最新仕様同期
+
+- [x] **Phase 6: Pricing & Revenue Optimization** `[x]`
+  - [x] **Pricing Update**: HP作成代行プランを含む4段階の料金体系（維持管理費込み）へ改定
+  - [x] **UI Refactoring**: `src/app/plans/page.tsx` を新料金体系に合わせて4カラム構成に刷新
+  - [x] Light Plan & WEB Member Yearly Adjustment: ライトプラン・WEB会員の年払いを「11ヶ月分」へ個別調整し完全同期
+  - [x] **UI/UX Polished**: 切替ボタンの視認性向上（白背景＋オレンジ枠）、価格表記の正確化、ヘッダー削除
+  - [x] **Specification Sync**: `PRICING_PLANS.md` の更新と戦略の定義
+- [x] **Phase 7: UI/UX Fine-tuning & Polishing** `[x]`
+  - [x] HP制作初期費用バナーをオレンジに戻し、SkyBlueボタンを追加
+  - [x] SaaS切替バナー（青）：サイズ、余白、角の丸みをHPバナーと統一
+  - [x] **WEB各プランの機能詳細化**: 全てのHP制作プランに具体的機能リストを追加
+  - [x] **レイアウトの安定化**: 枠サイズの固定と情報の密度調整
+  - [x] **FAQの拡充（8項目）**: スマホ運用、解約縛りの有無、AIの使い勝手等を網羅

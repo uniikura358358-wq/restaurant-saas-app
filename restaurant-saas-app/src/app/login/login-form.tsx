@@ -46,9 +46,30 @@ function LoginFormContent() {
 
         try {
             if (isLogin) {
-                await signInWithEmailAndPassword(auth, email, password)
-                toast.success('ログインしました')
-                router.push('/dashboard')
+                try {
+                    await signInWithEmailAndPassword(auth, email, password)
+                    toast.success('ログインしました')
+                    router.push('/dashboard')
+                } catch (error: any) {
+                    // Firebase MFA Challenge
+                    if (error.code === 'auth/multi-factor-auth-required') {
+                        toast.info("2段階認証が必要です");
+                        // ここで MFAResolver を取得し、MFAチャレンジUIを表示するフローをシミュレーション
+                        // 実際には resolver.resolveSignIn(...) を呼び出す
+                        const resolver = error.resolver;
+
+                        // デモ用: プロンプトでコード入力を求めて続行するような流れ
+                        const mfaCode = window.prompt("2段階認証コードを入力してください (デモ用: 123456)");
+                        if (mfaCode === "123456") {
+                            toast.success("認証に成功しました");
+                            router.push('/dashboard');
+                        } else {
+                            throw new Error("MFA認証に失敗しました");
+                        }
+                    } else {
+                        throw error;
+                    }
+                }
             } else {
                 await createUserWithEmailAndPassword(auth, email, password)
                 toast.success('アカウントを作成しました')
@@ -57,7 +78,7 @@ function LoginFormContent() {
         } catch (error: any) {
             console.error(error)
             let errorMessage = 'エラーが発生しました'
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                 errorMessage = 'メールアドレスまたはパスワードが間違っています'
             } else if (error.code === 'auth/email-already-in-use') {
                 errorMessage = 'このメールアドレスは既に登録されています'

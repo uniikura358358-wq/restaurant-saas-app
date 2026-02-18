@@ -3,7 +3,10 @@ import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { AdminWrapper } from "@/components/admin/AdminWrapper";
+import { Footer } from "@/components/Footer";
 import { checkRequiredEnvVars } from "@/lib/check-env";
+import { ThemeProvider } from "@/components/theme-provider";
+import { CustomerSupportChat } from "@/components/CustomerSupportChat";
 
 // 起動時に環境変数をチェック (Phase 0: 安全装置)
 checkRequiredEnvVars();
@@ -37,17 +40,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja">
+    <html lang="ja" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansJp.variable} font-sans antialiased`}
       >
-        <AdminWrapper>
-          {/* メインコンテンツ */}
-          {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AdminWrapper>
+            <div className="flex flex-col min-h-screen">
+              {/* メインコンテンツ */}
+              <main className="flex-grow">
+                {children}
+              </main>
 
-          {/* トースト通知の設定：画面上部中央に表示し、ステータスに応じた色を付ける */}
-          <Toaster position="top-center" richColors closeButton />
-        </AdminWrapper>
+              {/* 共通フッター */}
+              <Footer />
+            </div>
+
+            {/* トースト通知の設定：画面上部中央に表示し、ステータスに応じた色を付ける */}
+            <Toaster position="top-center" richColors closeButton />
+
+            {/* カスタマーサポートチャット（グローバル表示） */}
+            <CustomerSupportChat />
+          </AdminWrapper>
+        </ThemeProvider>
       </body>
     </html>
   );

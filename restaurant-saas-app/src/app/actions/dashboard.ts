@@ -1,7 +1,8 @@
 "use server";
 
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
-import { DashboardStats, FirestoreReview } from "@/types/firestore";
+import { DashboardStats, FirestoreReview, Announcement } from "@/types/firestore";
+import { FieldValue } from "firebase-admin/firestore";
 import { headers, cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
@@ -49,11 +50,11 @@ const MOCK_INIT_REPLIED = 5;
  */
 export async function getDashboardStats(idToken: string): Promise<DashboardStats> {
     const uid = await verifyUser(idToken);
-    const cookieStore = await headers();
+    const cookieStore = await cookies();
 
     try {
-        // Demoモード判定
-        const isDemo = uid === "demo-user-id" || cookieStore.get('is_demo_mode')?.value === 'true';
+        // Demoモード判定: 明示的に demo-user-id である場合のみに制限
+        const isDemo = uid === "demo-user-id";
 
         if (isDemo) {
             // Cookieから返信済みIDリストを取得
@@ -85,12 +86,20 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
                 averageRating: 4.8,
                 lowRatingCount: 2,
                 aiUsage: {
-                    sent: aiUsageCount,
-                    limit: 100,
-                    remaining: Math.max(0, 100 - aiUsageCount)
+                    text: {
+                        sent: aiUsageCount,
+                        limit: 2000,
+                        remaining: Math.max(0, 2000 - aiUsageCount)
+                    },
+                    image: {
+                        sent: 12,
+                        limit: 60,
+                        remaining: 48
+                    }
                 },
                 planName: "Standard",
                 storeName: "デモ店舗 (Demo Store)",
+                nextPaymentDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
                 updatedAt: new Date(),
             };
         }
@@ -106,10 +115,32 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
 
         const statsData = statsSnap.data();
         const userData = userSnap.data();
-        const planName = userData?.plan || "Light Plan";
+
+        // プラン名の正規化
+        // 1.5 管理者によるプラン偽装 (Simulated Plan) のチェック
+        const adminId = process.env.NEXT_PUBLIC_ADMIN_USER_ID;
+        const isAdmin = uid === adminId || uid === "demo-user-id";
+        let planName = userData?.plan || "web Light";
+
+        if (isAdmin) {
+            const simulatedPlanCookie = cookieStore.get("simulated_plan")?.value;
+            if (simulatedPlanCookie) {
+                planName = simulatedPlanCookie;
+            }
+        }
+
+        // プラン名の正規化
+        const normalized = planName.toLowerCase();
+        if (normalized.includes('premium')) planName = 'web Pro Premium';
+        else if (normalized.includes('pro') || normalized === 'business') planName = 'web Pro';
+        else if (normalized.includes('standard')) planName = 'web Standard';
+        else planName = 'web Light';
 
         // 2. AIクォータ情報の取得
-        const aiQuota = await checkAiQuota(uid, planName);
+        const [textQuota, imageQuota] = await Promise.all([
+            checkAiQuota(uid, planName, 'text'),
+            checkAiQuota(uid, planName, 'image')
+        ]);
 
         // 3. 店舗情報の取得
         const storeRef = adminDb.collection("stores").doc(uid);
@@ -117,18 +148,26 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
         const storeData = storeSnap.data();
 
         return {
-            totalReviews: statsData?.totalReviews || 0,
-            unrepliedCount: statsData?.unrepliedCount || 0,
-            repliedCount: statsData?.repliedCount || 0,
+            totalReviews: Math.max(0, statsData?.totalReviews || 0),
+            unrepliedCount: Math.max(0, statsData?.unrepliedCount || 0),
+            repliedCount: Math.max(0, statsData?.repliedCount || 0),
             averageRating: statsData?.averageRating || 0,
-            lowRatingCount: statsData?.lowRatingCount || 0,
+            lowRatingCount: Math.max(0, statsData?.lowRatingCount || 0),
             aiUsage: {
-                sent: aiQuota.usage.sent,
-                limit: aiQuota.usage.limit,
-                remaining: aiQuota.usage.remaining
+                text: {
+                    sent: textQuota.usage.sent,
+                    limit: textQuota.usage.limit,
+                    remaining: textQuota.usage.remaining
+                },
+                image: {
+                    sent: imageQuota.usage.sent,
+                    limit: imageQuota.usage.limit,
+                    remaining: imageQuota.usage.remaining
+                }
             },
             planName: planName,
             storeName: storeData?.storeName || "",
+            nextPaymentDate: userData?.nextPaymentDate?.toDate() || null,
             updatedAt: statsData?.updatedAt?.toDate() || new Date(),
         };
     } catch (error) {
@@ -140,9 +179,13 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
             repliedCount: 0,
             averageRating: 0,
             lowRatingCount: 0,
-            aiUsage: { sent: 0, limit: 10, remaining: 10 },
+            aiUsage: {
+                text: { sent: 0, limit: 2000, remaining: 2000 },
+                image: { sent: 0, limit: 0, remaining: 0 }
+            },
             planName: "Light Plan",
             storeName: "Loading Error...",
+            nextPaymentDate: null,
             updatedAt: new Date(),
         };
     }
@@ -166,7 +209,7 @@ export async function getReviews(
 
     try {
         if (uid === "demo-user-id") {
-            const cookieStore = await headers();
+            const cookieStore = await cookies();
             const repliedCookie = cookieStore.get('replied_reviews')?.value || cookieStore.get('demo_replied_ids')?.value || '';
             const repliedIds = new Set<string>();
 
@@ -281,7 +324,7 @@ export async function submitReply(idToken: string, reviewId: string, replyText: 
     const cookieStore = await cookies();
 
     // デモモード判定
-    const isDemo = uid === "demo-user-id" || cookieStore.get('is_demo_mode')?.value === 'true';
+    const isDemo = uid === "demo-user-id";
 
     if (isDemo) {
         // --- デモモード用: CookieにIDを追記 ---
@@ -297,17 +340,65 @@ export async function submitReply(idToken: string, reviewId: string, replyText: 
 
         // AI利用回数のインクリメント
         const aiUsageCookie = cookieStore.get("ai_usage_count")?.value;
-        const currentAiUsage = aiUsageCookie ? parseInt(aiUsageCookie, 10) : 45;
+        // getDashboardStats 側の初期値 (45 + 既に返信した件数) と整合性を取る
+        const currentAiUsage = aiUsageCookie ? parseInt(aiUsageCookie, 10) : 45 + (repliedSet.size - 1);
         cookieStore.set("ai_usage_count", (currentAiUsage + 1).toString(), {
             path: '/',
             maxAge: 60 * 60 * 24
         });
     } else {
-        // --- 本番用: Route Handler またはここにロジックを実装 ---
-        // 現状は既存の API Route (/api/reviews/submit-reply) を活用するため、
-        // 必要に応じてここから internal fetch するかロジックを共通化
-        // 暫定的にデモモード以外はエラーを投げるか、APIの実装を反映
-        throw new Error("Production logic for submitReply in Server Action is not yet fully implemented. Please use API Route for now.");
+        const reviewRef = adminDb.collection("reviews").doc(reviewId);
+        const statsRef = adminDb.collection("users").doc(uid).collection("stats").doc("current");
+
+        await adminDb.runTransaction(async (t) => {
+            const [reviewSnap, statsSnap] = await Promise.all([
+                t.get(reviewRef),
+                t.get(statsRef)
+            ]);
+
+            if (!reviewSnap.exists) throw new Error("レビューが見つかりませんでした");
+            const reviewData = reviewSnap.data();
+            if (reviewData?.userId !== uid) throw new Error("権限がありません");
+            if (reviewData?.status === "replied") return; // 既に返信済み
+
+            // 1. レビューの更新
+            t.update(reviewRef, {
+                status: "replied",
+                replySummary: replyText,
+                updatedAt: FieldValue.serverTimestamp()
+            });
+
+            // 2. 統計の更新
+            if (statsSnap.exists) {
+                t.update(statsRef, {
+                    unrepliedCount: FieldValue.increment(-1),
+                    repliedCount: FieldValue.increment(1),
+                    updatedAt: FieldValue.serverTimestamp()
+                });
+            } else {
+                // 存在しない場合は作成 (安全策)
+                // 既存のレビュー数をカウントするのが理想だが、ここでは最小構成で初期化
+                t.set(statsRef, {
+                    totalReviews: 1,
+                    unrepliedCount: 0,
+                    repliedCount: 1,
+                    averageRating: 5.0,
+                    lowRatingCount: 0,
+                    updatedAt: FieldValue.serverTimestamp()
+                });
+            }
+
+            // 3. AI利用枠のインクリメント
+            const now = new Date();
+            const usageMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+            const usageRef = adminDb.collection("stores").doc(uid).collection("monthly_usage").doc(usageMonth);
+
+            t.set(usageRef, {
+                aiTextCostYen: FieldValue.increment(0.35),
+                aiTextCount: FieldValue.increment(1),
+                updatedAt: FieldValue.serverTimestamp()
+            }, { merge: true });
+        });
     }
 
     // パス再検証

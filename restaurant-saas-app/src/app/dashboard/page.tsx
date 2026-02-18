@@ -4,15 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { MessageCircle, Sparkles, Loader2, Copy, RotateCcw, CheckCircle, XCircle } from "lucide-react";
+import { useAdminDebug } from "@/context/AdminDebugContext";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ToastContainer, useToast } from "@/components/ui/toast-custom";
+import { toast } from "sonner";
 import { AppSidebar } from "@/components/app-sidebar";
 import ReviewReplyButton from "@/components/review-reply-button";
 import { getDashboardStats, getReviews, submitReply } from "@/app/actions/dashboard";
-import { DashboardStats, FirestoreReview } from "@/types/firestore";
+import { DashboardStats, FirestoreReview, Announcement } from "@/types/firestore";
 
 export default function DashboardPage() {
   const { user, loading: authLoading, getToken } = useAuth();
@@ -23,6 +24,22 @@ export default function DashboardPage() {
 
   // Reviews State
   const [reviews, setReviews] = useState<FirestoreReview[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([
+    {
+      id: "1",
+      title: "システムメンテナンスのお知らせ",
+      content: "2026年3月1日午前2:00〜4:00まで、データベースのアップグレードに伴いサービスを一時停止いたします。",
+      createdAt: new Date(),
+      isRead: false
+    },
+    {
+      id: "2",
+      title: "新機能：AI返信の自動修正機能が追加されました",
+      content: "生成された返信案をさらに自然な日本語に修正するAIアドバイザー機能がプレミアムプランで利用可能になりました。",
+      createdAt: new Date(Date.now() - 86400000),
+      isRead: true
+    }
+  ]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "replied">("pending");
@@ -30,16 +47,25 @@ export default function DashboardPage() {
   // Reply Input State
   const [replies, setReplies] = useState<{ [key: string]: string }>({});
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [sentReviewId, setSentReviewId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [hiddenReviewIds, setHiddenReviewIds] = useState<Set<string>>(new Set());
 
-  const { toasts, addToast } = useToast();
+
+  const { simulatedPlan } = useAdminDebug();
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login?redirect=/dashboard");
     }
   }, [user, authLoading, router]);
+
+  // プラン偽装 (Simulated Plan) の変更を検知して即座に再取得
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [simulatedPlan, user]); // fetchData は useCallback 内で定義されているため安定
 
   // ─── データ取得 (Server Actions) ───
   const fetchData = useCallback(async () => {
@@ -69,6 +95,13 @@ export default function DashboardPage() {
           repliedCount: 0,
           averageRating: 0,
           lowRatingCount: 0,
+          aiUsage: {
+            text: { sent: 0, limit: 0, remaining: 0 },
+            image: { sent: 0, limit: 0, remaining: 0 }
+          },
+          planName: "",
+          storeName: "",
+          nextPaymentDate: null,
           updatedAt: new Date()
         });
         setReviews([]);
@@ -101,7 +134,7 @@ export default function DashboardPage() {
     try {
       const token = await getToken();
       if (!token) {
-        addToast("ユーザー認証エラー: 再ログインしてください", "error");
+        toast.error("ユーザー認証エラー: 再ログインしてください");
         return;
       }
 
@@ -112,7 +145,28 @@ export default function DashboardPage() {
         throw new Error("保存に失敗しました");
       }
 
-      addToast("返信を送信しました");
+      // 成功通知の表示
+      setSentReviewId(reviewId);
+      setTimeout(() => setSentReviewId(null), 3000);
+      toast.success("返信を送信しました");
+
+      // 統計の楽観的更新 (UIの反映を速める)
+      setStats(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          unrepliedCount: Math.max(0, prev.unrepliedCount - 1),
+          repliedCount: prev.repliedCount + 1,
+          aiUsage: prev.aiUsage ? {
+            ...prev.aiUsage,
+            text: {
+              ...prev.aiUsage.text,
+              sent: prev.aiUsage.text.sent + 1,
+              remaining: Math.max(0, prev.aiUsage.text.remaining - 1)
+            }
+          } : prev.aiUsage
+        };
+      });
       // 入力状態のリセット
       setReplies(prev => {
         const next = { ...prev };
@@ -120,13 +174,12 @@ export default function DashboardPage() {
         return next;
       });
 
-      // サーバー状態と同期
-      router.refresh();
+      // 最新状態への同期 (念押し)
       await fetchData();
 
     } catch (err: any) {
       console.error(err);
-      addToast(err.message || "保存できませんでした", "error");
+      toast.error(err.message || "保存できませんでした");
       // エラー時は非表示を解除
       setHiddenReviewIds(prev => {
         const next = new Set(prev);
@@ -157,12 +210,12 @@ export default function DashboardPage() {
       }
 
       const data = await response.json();
-      addToast(data.message || "同期が完了しました");
+      toast.success(data.message || "同期が完了しました");
       // 同期後にデータを再フェッチ
       await fetchData();
     } catch (err: any) {
       console.error(err);
-      addToast(err.message || "同期中または設定に問題があります", "error");
+      toast.error(err.message || "同期中または設定に問題があります");
     } finally {
       setSyncing(false);
     }
@@ -172,17 +225,21 @@ export default function DashboardPage() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      addToast("コピーしました");
+      toast.success("コピーしました");
     } catch {
-      addToast("コピーに失敗しました", "error");
+      toast.error("コピーに失敗しました");
     }
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/10 tracking-tight" style={{ overflowWrap: "break-word" }}>
-      <ToastContainer toasts={toasts} />
       <div className="flex h-screen max-h-screen">
-        <AppSidebar activePage="dashboard" />
+        <AppSidebar
+          activePage="dashboard"
+          user={user}
+          stats={stats}
+          announcements={announcements}
+        />
 
         <main className="flex-1 overflow-y-auto bg-muted/20">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
@@ -236,7 +293,7 @@ export default function DashboardPage() {
             </header>
 
             {/* KPI Dashboard (Stats from Firestore) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
               <div className="bg-card p-5 rounded-xl shadow-sm border">
                 <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">総口コミ数</div>
                 <div className="text-3xl font-black">{stats?.totalReviews ?? "-"} <span className="text-xs font-medium opacity-50">件</span></div>
@@ -258,16 +315,30 @@ export default function DashboardPage() {
                   至急対応が必要です
                 </div>
               </div>
-              <div className="bg-card p-5 rounded-xl shadow-sm border">
-                <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">AI 生成枠 (今月)</div>
+              <div className="bg-card p-5 rounded-xl shadow-sm border border-emerald-100/50">
+                <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">AI 返信案作成 (残枠)</div>
                 <div className="text-3xl font-black">
-                  {stats?.aiUsage ? `${stats.aiUsage.remaining}` : "-"}
-                  <span className="text-xs font-medium opacity-50"> / {stats?.aiUsage?.limit ?? "-"}</span>
+                  {stats?.aiUsage?.text ? `${stats.aiUsage.text.remaining}` : "-"}
+                  <span className="text-xs font-medium opacity-50"> / {stats?.aiUsage?.text?.limit ?? "-"}</span>
                 </div>
                 <div className="w-full bg-muted h-1 rounded-full mt-3 overflow-hidden">
                   <div
-                    className="bg-primary h-full transition-all duration-1000"
-                    style={{ width: `${stats?.aiUsage ? (stats.aiUsage.sent / stats.aiUsage.limit) * 100 : 0}%` }}
+                    className="bg-emerald-500 h-full transition-all duration-1000"
+                    style={{ width: `${stats?.aiUsage?.text ? (stats.aiUsage.text.sent / stats.aiUsage.text.limit) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-card p-5 rounded-xl shadow-sm border border-indigo-100/50">
+                <div className="text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">AI 画像生成 (残枠)</div>
+                <div className="text-3xl font-black">
+                  {stats?.aiUsage?.image ? `${stats.aiUsage.image.remaining}` : "-"}
+                  <span className="text-xs font-medium opacity-50"> / {stats?.aiUsage?.image?.limit ?? "-"}</span>
+                </div>
+                <div className="w-full bg-muted h-1 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className="bg-indigo-600 h-full transition-all duration-1000"
+                    style={{ width: `${stats?.aiUsage?.image ? (stats.aiUsage.image.sent / stats.aiUsage.image.limit) * 100 : 0}%` }}
                   />
                 </div>
               </div>
@@ -287,7 +358,7 @@ export default function DashboardPage() {
                 <div className="flex justify-center">
                   <Button
                     variant="outline"
-                    className="text-gray-500 border-gray-200 hover:bg-gray-100"
+                    className="text-muted-foreground border-border hover:bg-muted"
                     onClick={() => {
                       localStorage.removeItem("demo_user");
                       localStorage.removeItem("simulatedPlan");
@@ -314,11 +385,11 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 gap-6">
                 {reviews.filter(r => !hiddenReviewIds.has(r.id)).map((review) => (
-                  <Card key={review.id} className={`shadow-sm hover:shadow-md transition-shadow overflow-hidden ${activeTab === "replied"
-                    ? "border-l-4 border-l-emerald-500 border-t-0 border-r-0 border-b-0 ring-1 ring-emerald-200/50"
-                    : "border-none ring-1 ring-black/5"
+                  <Card key={review.id} className={`shadow-sm hover:shadow-md transition-shadow relative ${activeTab === "replied"
+                    ? "border-l-4 border-l-emerald-500 border-t-0 border-r-0 border-b-0 ring-1 ring-emerald-500/20"
+                    : "border-none ring-1 ring-foreground/5"
                     }`}>
-                    <CardHeader className={`border-b py-4 ${activeTab === "replied" ? "bg-emerald-50/50" : "bg-muted/30"
+                    <CardHeader className={`border-b py-4 ${activeTab === "replied" ? "bg-emerald-500/5 dark:bg-emerald-500/10" : "bg-muted/30"
                       }`}>
                       <div className="flex items-start justify-between">
                         <div className="space-y-1 min-w-0 flex-1">
@@ -341,7 +412,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         {activeTab === "replied" ? (
-                          <Badge className="text-[11px] font-bold px-2.5 py-1 shrink-0 ml-2 bg-emerald-100 text-emerald-700 border border-emerald-300">
+                          <Badge className="text-[11px] font-bold px-2.5 py-1 shrink-0 ml-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                             <CheckCircle className="size-3.5 mr-1" />
                             返信済み
                           </Badge>
@@ -415,15 +486,27 @@ export default function DashboardPage() {
 
                     {/* 保存ボタン (AI生成後) */}
                     {activeTab === "pending" && replies[review.id] && (
-                      <div className="px-6 py-4 bg-white border-t flex justify-end">
-                        <Button
-                          onClick={() => handleSaveReply(review.id, replies[review.id])}
-                          disabled={submittingId === review.id}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                        >
-                          {submittingId === review.id ? <Loader2 className="animate-spin size-4 mr-2" /> : null}
-                          {submittingId === review.id ? "送信中..." : "Googleに返信を送信"}
-                        </Button>
+                      <div className="px-6 py-4 bg-card border-t flex justify-end">
+                        <div className="relative">
+                          {sentReviewId === review.id && (
+                            <div className="absolute bottom-full right-0 mb-3 animate-in fade-in slide-in-from-bottom-2 duration-500 z-50">
+                              <div className="bg-card border border-primary/20 px-4 py-2 rounded-xl shadow-lg flex items-center gap-2.5 whitespace-nowrap">
+                                <div className="bg-primary rounded-full p-1">
+                                  <CheckCircle className="size-3 text-white" />
+                                </div>
+                                <span className="text-xs font-bold text-foreground">送信完了しました！</span>
+                              </div>
+                            </div>
+                          )}
+                          <Button
+                            onClick={() => handleSaveReply(review.id, replies[review.id])}
+                            disabled={submittingId === review.id}
+                            className="h-12 px-8 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-md transition-all active:scale-95"
+                          >
+                            {submittingId === review.id ? <Loader2 className="animate-spin size-5 mr-2" /> : <CheckCircle className="size-5 mr-2" />}
+                            {submittingId === review.id ? "送信中..." : "Googleに返信を送信"}
+                          </Button>
+                        </div>
                       </div>
                     )}
 

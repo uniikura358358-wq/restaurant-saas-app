@@ -35,30 +35,57 @@ export function getCurrentMonth(): string {
 }
 
 export const AI_LIMITS: Record<string, number> = {
-    'Light Plan': 30,
-    'Standard Plan': 60,
-    'Premium Plan': 90,
+    'web Light': 0,
+    'web Standard': 50,
+    'web Pro': 200,
+    'web Pro Premium': 450,
+    // 互換性維持
+    'Standard': 50,
+    'Pro': 200,
+    'Pro Premium': 450,
+    'free': 0,
+    'standard': 50,
+    'premium': 450,
+    'pro': 200,
     'default': 0
 };
 
 /** 内部予算リミット (テキスト生成月間上限: 非公開) */
 export const INTERNAL_COST_LIMITS_YEN: Record<string, number> = {
-    'Light Plan': 700,
-    'Standard Plan': 1500,
-    'Premium Plan': 2000,
+    'web Light': 100,
+    'web Standard': 650, // 微増して50/400回を確実にカバー
+    'web Pro': 1800,
+    'web Pro Premium': 3800, // 450/1700回を確実にカバー
+    // 互換性維持
+    'Standard': 650,
+    'Pro': 1800,
+    'Pro Premium': 3800,
+    'free': 100,
+    'standard': 650,
+    'premium': 3800,
+    'pro': 1800,
     'default': 100
 };
 
 /** 内部回数リミット (テキスト生成月間上限: 非公開) - 予算とは別に物理的な上限を設ける */
 export const INTERNAL_TEXT_COUNT_LIMITS: Record<string, number> = {
-    'Light Plan': 2000,
-    'Standard Plan': 4000,
-    'Premium Plan': 5500,
-    'default': 100
+    'web Light': 10,
+    'web Standard': 400, // 500から調整: 予算650円内で画像50枚と両立
+    'web Pro': 1000,
+    'web Pro Premium': 1700, // 2000から調整: 予算3800円内で画像450枚と両立
+    // 互換性維持
+    'Standard': 400,
+    'Pro': 1000,
+    'Pro Premium': 1700,
+    'free': 10,
+    'standard': 400,
+    'premium': 1700,
+    'pro': 1000,
+    'default': 10
 };
 
-/** AIテキスト生成の1回あたり想定コスト (円) - gemini-3-flash-preview等に合わせて調整 */
-export const ESTIMATED_COST_PER_TEXT_CALL_YEN = 0.35;
+/** AIテキスト生成の1回あたり想定コスト (円) - gemini-3-pro-preview (Thinking: LOW) 構成に合わせて調整 */
+export const ESTIMATED_COST_PER_TEXT_CALL_YEN = 0.86;
 
 export function getAiLimitByPlan(planName: string | null, type: 'image' | 'text' = 'image'): { budget?: number; count: number } {
     if (type === 'text') {
@@ -115,8 +142,8 @@ export async function checkAiQuota(
         const costAllowed = currentCost < (limits.budget || 0);
         const countAllowed = currentCount < limits.count;
         allowed = costAllowed && countAllowed;
-        currentUsageValue = currentCost; // 予算を優先表示
-        limitValue = limits.budget || 0;
+        currentUsageValue = currentCount; // ユーザーには回数を表示
+        limitValue = limits.count || 0;
     }
 
     const summary: AiUsageSummary = {

@@ -8,10 +8,10 @@ import { doc, getDoc, disableNetwork } from 'firebase/firestore';
  * プラン名の定数定義 (表記ゆれ・タイポ防止)
  */
 export const PLAN_NAMES = {
-    FREE: 'Free',
-    LIGHT: 'Light',
-    STANDARD: 'Standard',
-    PREMIUM: 'Premium'
+    FREE: 'web Light',
+    LIGHT: 'web Standard',
+    STANDARD: 'web Pro',
+    PREMIUM: 'web Pro Premium'
 } as const;
 
 export type PlanLevel = typeof PLAN_NAMES[keyof typeof PLAN_NAMES];
@@ -50,15 +50,18 @@ export function usePlanGuard() {
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                setPlanName(data.plan || data.planName || 'Free');
+                const rawPlan = data.plan || data.planName || 'web Light';
+                // 旧名称 'Free' / 'free' / 'WEB会員' を 'web Light' に正規化
+                const normalizedPlan = (typeof rawPlan === 'string' && (rawPlan.toLowerCase() === 'free' || rawPlan === 'WEB会員')) ? 'web Light' : rawPlan;
+                setPlanName(normalizedPlan);
             } else {
                 console.log('No profile found for user:', user.uid);
-                setPlanName('Free');
+                setPlanName('web Light');
             }
         } catch (err: any) {
             console.error('Plan fetch error (falling back to Free):', err);
             // オフラインエラーや権限不足時は Free として扱う
-            setPlanName('Free');
+            setPlanName('web Light');
         } finally {
             setLoading(false);
         }
@@ -88,34 +91,35 @@ export function usePlanGuard() {
         if (!effectivePlanName) return false;
 
         const plan = effectivePlanName.toLowerCase();
+        const isPro = plan.includes('pro');
+        const isPremium = plan.includes('premium');
 
         switch (feature) {
             case 'instagram':
-                // Standard以上で許可
-                return [
-                    PLAN_NAMES.STANDARD.toLowerCase(),
-                    PLAN_NAMES.PREMIUM.toLowerCase()
-                ].includes(plan);
+                // Pro以上で許可（webの有無を問わない）
+                return isPro || isPremium;
             case 'ai_pop':
                 // Premiumのみ
-                return [
-                    PLAN_NAMES.PREMIUM.toLowerCase()
-                ].includes(plan);
+                return isPremium;
             case 'priority_support':
                 // Premiumのみ
-                return [
-                    PLAN_NAMES.PREMIUM.toLowerCase()
-                ].includes(plan);
+                return isPremium;
             default:
                 return false;
         }
     };
+
+    const isWebPlan = effectivePlanName ? (
+        effectivePlanName.toLowerCase().startsWith('web') ||
+        effectivePlanName === 'WEB会員'
+    ) : false;
 
     return {
         planName: effectivePlanName,
         realPlanName: planName,
         loading: loading || authLoading,
         hasFeature,
+        isWebPlan,
         refreshPlan: () => fetchPlan(true)
     };
 }

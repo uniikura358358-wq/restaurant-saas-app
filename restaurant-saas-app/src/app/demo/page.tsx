@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import ReviewReplyButton from '@/components/ReviewReplyButton';
+import ReviewReplyButton from '@/components/review-reply-button';
 
 export default function DemoPage() {
     const dummyReview = {

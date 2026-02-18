@@ -26,10 +26,10 @@ export function AdminToolbar() {
 
     const planOptions = [
         { label: 'Real', value: null },
-        { label: 'Free', value: 'Free' },
-        { label: 'Light', value: 'Light' },
-        { label: 'Standard', value: 'Standard' },
-        { label: 'Premium', value: 'Premium' },
+        { label: 'web Light', value: 'web Light' },
+        { label: 'web Standard', value: 'web Standard' },
+        { label: 'web Pro', value: 'web Pro' },
+        { label: 'web Pro Premium', value: 'web Pro Premium' },
     ] as const;
 
     return (
