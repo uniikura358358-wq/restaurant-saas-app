@@ -47,12 +47,31 @@ export async function GET(request: Request) {
 
         const uid = user.uid;
 
+        // 【デモユーザーガード】Firestore設定不備によるエラーを回避
+        if (uid === "demo-user-id") {
+            const demoResult = {
+                ...DEFAULT_SETTINGS,
+                id: uid,
+                user_id: uid,
+                store_name: "デモ店舗",
+                store_area: "東京都中央区銀座",
+                reply_templates: {
+                    "5": { title: "感謝", body: "{お客様名}様、ありがとうございます！" },
+                    "1": { title: "謝罪", body: "{お客様名}様、申し訳ございません。" }
+                },
+                user_email: "demo@example.com",
+            };
+            return NextResponse.json(demoResult);
+        }
+
         // 2. Fetch Data from Firestore
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
         let profileDoc, storeDoc;
         try {
             [profileDoc, storeDoc] = await Promise.all([
-                adminDb.collection('users').doc(uid).get(),
-                adminDb.collection('stores').doc(uid).get()
+                db.collection('users').doc(uid).get(),
+                db.collection('stores').doc(uid).get()
             ]);
         } catch (dbError) {
             console.warn("Firestore fetch failed (likely build time or no creds):", dbError);
@@ -70,7 +89,9 @@ export async function GET(request: Request) {
         let smsUsage = { sent: 0, limit: smsLimitOverride, remaining: smsLimitOverride, usageMonth: "" };
         try {
             // This might fail if adminDb is mocked incorrectly
-            smsUsage = await getSmsUsageSummary(uid, smsLimitOverride);
+            if (uid !== "demo-user-id") {
+                smsUsage = await getSmsUsageSummary(uid, smsLimitOverride);
+            }
         } catch (e) {
             console.error("SMS usage fetch fail", e);
             // Ignore error and use default
@@ -79,19 +100,22 @@ export async function GET(request: Request) {
         const result = {
             id: uid,
             user_id: uid,
-            store_name: storeData?.storeName ?? "",
-            store_area: storeData?.address ?? "",
+            store_name: storeData?.storeName ?? (uid === "demo-user-id" ? "デモ店舗" : ""),
+            store_area: storeData?.address ?? (uid === "demo-user-id" ? "東京都中央区銀座" : ""),
             ai_tone: storeData?.aiTone ?? "polite",
             default_signature: storeData?.defaultSignature ?? storeData?.websiteMaterials?.catchCopy ?? "",
             emoji_level: storeData?.emojiLevel ?? 2,
             auto_reply_delay_minutes: storeData?.autoReplyDelayMinutes ?? 30,
             reply_config: storeData?.replyConfig ?? DEFAULT_SETTINGS.reply_config,
-            reply_templates: storeData?.replyTemplates ?? {},
+            reply_templates: storeData?.replyTemplates ?? (uid === "demo-user-id" ? {
+                "5": { title: "感謝", body: "{お客様名}様、ありがとうございます！" },
+                "1": { title: "謝罪", body: "{お客様名}様、申し訳ございません。" }
+            } : {}),
             notification_config: storeData?.notificationConfig ?? DEFAULT_NOTIFICATION_CONFIG,
             sms_limit_override: smsLimitOverride,
             sms_usage: smsUsage,
             ai_usage: { sent: 0, limit: 30, remaining: 30, usageMonth: "" },
-            user_email: user.email || profile?.email || "",
+            user_email: user.email || profile?.email || (uid === "demo-user-id" ? "demo@example.com" : ""),
         };
 
         return NextResponse.json(result);

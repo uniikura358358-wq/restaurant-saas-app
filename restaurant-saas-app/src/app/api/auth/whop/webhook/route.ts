@@ -50,16 +50,26 @@ export async function POST(request: Request) {
                 }
 
                 // Find user in Firebase Auth
+                const { adminAuthSecondary, getDbForUser } = await import('@/lib/firebase-admin');
                 let uid: string;
                 try {
                     const userRecord = await adminAuth.getUserByEmail(email);
                     uid = userRecord.uid;
                 } catch (error: any) {
                     if (error.code === 'auth/user-not-found') {
-                        console.log(`User not found for email: ${email}. Skipping sync.`);
-                        return NextResponse.json({ success: true, message: 'User not found' });
+                        try {
+                            const userRecord = await adminAuthSecondary.getUserByEmail(email);
+                            uid = userRecord.uid;
+                        } catch (secError: any) {
+                            if (secError.code === 'auth/user-not-found') {
+                                console.log(`User not found for email: ${email}. Skipping sync.`);
+                                return NextResponse.json({ success: true, message: 'User not found' });
+                            }
+                            throw secError;
+                        }
+                    } else {
+                        throw error;
                     }
-                    throw error;
                 }
 
                 // Determine Plan Level
@@ -71,7 +81,8 @@ export async function POST(request: Request) {
 
                 // Update Firestore Profile
                 try {
-                    await adminDb.collection('users').doc(uid).set({
+                    const db = await getDbForUser(uid);
+                    await db.collection('users').doc(uid).set({
                         plan: planName.toLowerCase(), // 'business' | 'light' | 'web light'
                         subscriptionStatus: planStatus,
                         planName: planName,
@@ -80,7 +91,6 @@ export async function POST(request: Request) {
                     console.log(`Synced plan for ${email}: ${planName} (${planStatus})`);
                 } catch (dbError) {
                     console.error("Firestore update failed:", dbError);
-                    // Suppress db error to avoid 500 to webhook sender if strictly needed, but 500 is appropriate.
                     throw dbError;
                 }
             }

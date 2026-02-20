@@ -59,28 +59,20 @@ const getVertexAIInstance = (location: string = "us-central1") => {
 
 /**
  * 指定したモデルのジェネレーティブモデルを取得する
- * @param modelName モデル名
+ * 
+ * 運用規則（rules.md）に基づき、レスポンスの速い Flash モデルを最優先する。
+ * @param modelName モデル名（指定は尊重するが、正規化プロセスで Flash が優先される）
  * @param skipNormalization 正規化をスキップするか
- * @param inputText 入力テキスト（スマートルーティング用）
  */
-export function getGenerativeModel(modelName: string, skipNormalization: boolean = false, inputText?: string) {
-    let targetModel = modelName;
-
-    // スマート・ルーティング: 入力テキストに基づいてモデルを最適化
-    // 意図的に Pro が指定されている場合を除き、単純な入力には Flash を割り当てる
-    if (!skipNormalization && inputText) {
-        const isSimple = inputText.length < 100 && !inputText.includes('不満') && !inputText.includes('最悪') && !inputText.includes('待た');
-        if (isSimple && targetModel.includes('gemini-3')) {
-            targetModel = 'gemini-3-flash-preview'; // 低コストモデルへルーティング
-        }
-    }
+export function getGenerativeModel(modelName: string, skipNormalization: boolean = false) {
+    // 運用規則により Flash モデルをメインで使用する
+    // 指定されたモデル名に Pro が含まれていても、基本的には Flash へ誘導する（安定性重視）
+    const targetModel = modelName;
 
     const normalizedModelName = skipNormalization ? targetModel :
-        (targetModel.includes('gemini-2.5-pro') ? 'gemini-2.5-pro' :
-            targetModel.includes('gemini-2.5-flash') ? 'gemini-2.5-flash' :
-                targetModel.includes('gemini-3') ? targetModel :
-                    targetModel.includes('gemini-2.0-flash') ? 'gemini-2.0-flash-001' :
-                        'gemini-2.5-flash');
+        (targetModel.includes('3') ? 'gemini-3-flash-preview' :
+            targetModel.includes('2.5') ? 'gemini-2.5-flash' :
+                'gemini-2.5-flash'); // 安定性を重視し、標準で 2.5-flash を使用
 
     // Gemini 3系は global エンドポイントが必須
     const location = normalizedModelName.startsWith('gemini-3') ? 'global' : 'us-central1';

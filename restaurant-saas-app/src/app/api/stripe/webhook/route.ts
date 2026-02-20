@@ -81,13 +81,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         return;
     }
 
+    const { getDbForUser } = await import('@/lib/firebase-admin');
+    const db = await getDbForUser(userId);
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
     // Map Stripe Price ID to internal Plan Name
     const planName = session.metadata?.planName || "Standard";
 
     try {
-        await adminDb.collection("users").doc(userId).update({
+        await db.collection("users").doc(userId).update({
             stripeCustomerId: customerId,
             stripeSubscriptionId: subscriptionId,
             plan: planName.toLowerCase(),
@@ -101,7 +103,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-    const snapshot = await adminDb.collection("users").where("stripeSubscriptionId", "==", subscription.id).limit(1).get();
+    const { adminDbSecondary } = await import('@/lib/firebase-admin');
+
+    // Try primary first
+    let snapshot = await adminDb.collection("users").where("stripeSubscriptionId", "==", subscription.id).limit(1).get();
+
+    // If not found, try secondary
+    if (snapshot.empty) {
+        snapshot = await adminDbSecondary.collection("users").where("stripeSubscriptionId", "==", subscription.id).limit(1).get();
+    }
 
     if (snapshot.empty) {
         console.warn(`No user found for subscription ${subscription.id}`);
@@ -116,7 +126,15 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-    const snapshot = await adminDb.collection("users").where("stripeSubscriptionId", "==", subscription.id).limit(1).get();
+    const { adminDbSecondary } = await import('@/lib/firebase-admin');
+
+    // Try primary first
+    let snapshot = await adminDb.collection("users").where("stripeSubscriptionId", "==", subscription.id).limit(1).get();
+
+    // If not found, try secondary
+    if (snapshot.empty) {
+        snapshot = await adminDbSecondary.collection("users").where("stripeSubscriptionId", "==", subscription.id).limit(1).get();
+    }
 
     if (snapshot.empty) {
         console.warn(`No user found for subscription ${subscription.id}`);
@@ -133,9 +151,16 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+    const { adminDbSecondary } = await import('@/lib/firebase-admin');
     const customerId = invoice.customer as string;
 
-    const snapshot = await adminDb.collection("users").where("stripeCustomerId", "==", customerId).limit(1).get();
+    // Try primary first
+    let snapshot = await adminDb.collection("users").where("stripeCustomerId", "==", customerId).limit(1).get();
+
+    // If not found, try secondary
+    if (snapshot.empty) {
+        snapshot = await adminDbSecondary.collection("users").where("stripeCustomerId", "==", customerId).limit(1).get();
+    }
 
     if (!snapshot.empty) {
         const userDoc = snapshot.docs[0];

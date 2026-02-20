@@ -5,7 +5,7 @@
  * プランに応じたハードリミット (30/60/90) を適用する。
  */
 
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, getDbForUser } from "@/lib/firebase-admin";
 
 // --- 型定義 ---
 
@@ -84,8 +84,8 @@ export const INTERNAL_TEXT_COUNT_LIMITS: Record<string, number> = {
     'default': 10
 };
 
-/** AIテキスト生成の1回あたり想定コスト (円) - gemini-3-pro-preview (Thinking: LOW) 構成に合わせて調整 */
-export const ESTIMATED_COST_PER_TEXT_CALL_YEN = 0.86;
+/** AIテキスト生成の1回あたり想定コスト (円) - gemini-3-flash-preview / gemini-2.5-flash 構成に合わせて調整 */
+export const ESTIMATED_COST_PER_TEXT_CALL_YEN = 0.10;
 
 export function getAiLimitByPlan(planName: string | null, type: 'image' | 'text' = 'image'): { budget?: number; count: number } {
     if (type === 'text') {
@@ -110,15 +110,9 @@ export async function checkAiQuota(
     type: 'image' | 'text' = 'image'
 ): Promise<AiQuotaCheckResult> {
     const usageMonth = getCurrentMonth();
+    const db = await getDbForUser(storeId);
 
-    // stores/{storeId}/usage/{usageMonth} または store_usage/{storeId_usageMonth}
-    // ここでは単純化のため store_usage/{storeId}_{usageMonth} ドキュメントを使用するか、
-    // あるいは `stores/{storeId}/stats/ai_usage` のようにサブコレクションにするか。
-    // 既存の実装に合わせて `store_usage` というルートコレクションを想定（あるいは `stores` のサブコレクション推奨だが、移行コストを抑えるためルートコレクションで実装）
-    // Firestore設計原則的には `stores/{storeId}/monthly_usage/{usageMonth}` が望ましい。
-    // 今回は `stores/{storeId}/monthly_usage/{usageMonth}` を採用する。
-
-    const docRef = adminDb
+    const docRef = db
         .collection("stores")
         .doc(storeId)
         .collection("monthly_usage")
@@ -177,15 +171,16 @@ export async function incrementAiUsage(
     costYen: number = ESTIMATED_COST_PER_TEXT_CALL_YEN
 ): Promise<void> {
     const usageMonth = getCurrentMonth();
+    const db = await getDbForUser(storeId);
 
-    const docRef = adminDb
+    const docRef = db
         .collection("stores")
         .doc(storeId)
         .collection("monthly_usage")
         .doc(usageMonth);
 
     try {
-        await adminDb.runTransaction(async (t) => {
+        await db.runTransaction(async (t) => {
             const doc = await t.get(docRef);
             const data = doc.exists ? doc.data() : {};
 

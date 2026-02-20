@@ -115,6 +115,22 @@ const NOISE_PATTERNS: RegExp[] = [
     /以下が返信文です[。:]?/g,
     /返信文[:：]/g,
     /```[\s\S]*?```/g, // コードブロックの除去
+    /【感謝】/g,
+    /【共感・謝罪】/g,
+    /【個別対応】/g,
+    /【再来店の促進】/g,
+    /【.*?】/g, // その他の見出しも除去
+];
+
+/** 
+ * Google 審査基準に基づく不適切語句チェック (NGワード)
+ * 医療的効果、差別、攻撃的表現、虚偽の期待など
+ */
+const INAPPROPRIATE_WORDS = [
+    "治る", "健康になる", "効く", // 医療的効果の誤認
+    "絶対", "必ず", // 虚偽の保証
+    "納得できない", "お客様の勘違い", // 攻撃的な反論
+    "死", "殺", "バカ", "アホ", // 暴力・暴言
 ];
 
 /**
@@ -127,6 +143,15 @@ const NOISE_PATTERNS: RegExp[] = [
  */
 export function sanitizeAiOutput(text: string, rating?: number, maxLength: number = 500): string {
     let cleaned = text;
+
+    // 不適切語句の検知と除去（安全弁）
+    for (const word of INAPPROPRIATE_WORDS) {
+        if (cleaned.includes(word)) {
+            // 単純除去ではなく、審査に耐えうるよう安全なフレーズに置換、またはログ出力
+            // 本来は再生成が望ましいが、ここでは簡易的に除去
+            cleaned = cleaned.split(word).join("");
+        }
+    }
 
     // 絵文字制限の適用
     if (rating !== undefined) {

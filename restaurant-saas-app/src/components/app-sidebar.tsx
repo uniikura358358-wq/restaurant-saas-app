@@ -8,20 +8,26 @@ import {
     Store,
     User,
     ChevronUp,
-    Layout
+    ChevronDown,
+    ChevronRight,
+    Layout,
+    Sparkles,
+    TrendingUp
 } from "lucide-react";
 import { UserAccountMenu } from "./user-account-menu";
 import { AnnouncementList } from "./announcement-list";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface AppSidebarProps {
-    activePage: "dashboard" | "store" | "account" | "plans" | "hp" | "settings";
+    activePage: "dashboard" | "store" | "account" | "plans" | "hp" | "settings" | "pop" | "accounting";
+    activeSubPage?: string;
+    onSubPageChange?: (page: string) => void;
     user?: any;
     stats?: any;
     announcements?: any[];
 }
 
-export function AppSidebar({ activePage, user, stats, announcements = [] }: AppSidebarProps) {
+export function AppSidebar({ activePage, activeSubPage, onSubPageChange, user, stats, announcements = [] }: AppSidebarProps) {
     const { isWebPlan } = usePlanGuard();
 
     return (
@@ -35,7 +41,7 @@ export function AppSidebar({ activePage, user, stats, announcements = [] }: AppS
                 </div>
             </div>
 
-            <nav className="flex-1 px-3 py-4 space-y-1">
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                 <Link
                     href="/dashboard"
                     className={cn(
@@ -46,7 +52,12 @@ export function AppSidebar({ activePage, user, stats, announcements = [] }: AppS
                     )}
                 >
                     <MessageCircle className="size-4" />
-                    <span>口コミ一覧</span>
+                    <span className="flex-1">口コミ一覧</span>
+                    {stats?.unrepliedCount > 0 && (
+                        <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse shadow-sm">
+                            未返信 {stats.unrepliedCount}件
+                        </span>
+                    )}
                 </Link>
                 <Link
                     href="/settings/store"
@@ -59,6 +70,69 @@ export function AppSidebar({ activePage, user, stats, announcements = [] }: AppS
                 >
                     <Store className="size-4" />
                     <span>店舗設定</span>
+                </Link>
+
+                {/* 経営・事務管理 (2段階メニュー) */}
+                <div className="space-y-1">
+                    <Link
+                        href="/dashboard/accounting"
+                        className={cn(
+                            "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors group",
+                            activePage === "accounting"
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                    >
+                        <TrendingUp className="size-4 text-emerald-500" />
+                        <span className="flex-1">経営・事務管理</span>
+                        {activePage === "accounting" ? (
+                            <ChevronDown className="size-3.5 opacity-50" />
+                        ) : (
+                            <ChevronRight className="size-3.5 opacity-30 group-hover:opacity-100 transition-opacity" />
+                        )}
+                    </Link>
+
+                    {/* サブメニュー */}
+                    {activePage === "accounting" && (
+                        <div className="ml-7 space-y-1 pb-2">
+                            {[
+                                { id: "overview", label: "概要" },
+                                { id: "sales", label: "売上管理" },
+                                { id: "finance", label: "収支・帳簿" },
+                                { id: "documents", label: "書類管理" }
+                            ].map((sub) => (
+                                <button
+                                    key={sub.id}
+                                    onClick={() => onSubPageChange?.(sub.id)}
+                                    className={cn(
+                                        "w-full text-left px-3 py-1.5 text-[13px] font-medium rounded-md transition-all flex items-center gap-2",
+                                        activeSubPage === sub.id
+                                            ? "text-primary bg-primary/5"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "size-1 rounded-full transition-all",
+                                        activeSubPage === sub.id ? "bg-primary scale-125" : "bg-muted-foreground/30"
+                                    )} />
+                                    {sub.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <Link
+                    href="/dashboard/tools/pop-maker"
+                    className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        activePage === "pop"
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                >
+                    <Sparkles className="size-4 text-amber-500" />
+                    <span>AI POP作成</span>
                 </Link>
                 <Link
                     href="/settings/account"

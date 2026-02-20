@@ -94,11 +94,38 @@ export function mapGoogleReviewToFirestore(review: any, userId: string, storeId:
 }
 
 /**
- * 口コミを取得する (Mock / Real)
+ * 口コミを取得する (Mock / Real 切り替え対応)
  * @param accountId 'accounts/ACCOUNT_ID'
  * @param locationId 'locations/LOCATION_ID'
  */
 export async function listReviews(accountId: string, locationId: string) {
+    // 開発・テスト用のシミュレーターモード
+    if (accountId === "accounts/mock-account-id") {
+        return [
+            {
+                name: `${accountId}/${locationId}/reviews/mock-1`,
+                reviewer: { displayName: "田中 太郎" },
+                starRating: "FIVE",
+                comment: "料理がとても美味しかったです！特に期間限定の冷やし中華が最高でした。接客も非常に丁寧で、また家族で来たいと思います。",
+                createTime: new Date().toISOString(),
+            },
+            {
+                name: `${accountId}/${locationId}/reviews/mock-2`,
+                reviewer: { displayName: "佐藤 美香" },
+                starRating: "TWO",
+                comment: "味は良かったのですが、予約していたのに20分以上待たされました。後の予定があったので困りました。改善してほしいです。",
+                createTime: new Date(Date.now() - 86400000).toISOString(),
+            },
+            {
+                name: `${accountId}/${locationId}/reviews/mock-3`,
+                reviewer: { displayName: "Google ユーザー" },
+                starRating: "FOUR",
+                comment: "落ち着いた雰囲気でゆっくり食事ができました。駐車場がもう少し広いと助かります。",
+                createTime: new Date(Date.now() - 172800000).toISOString(),
+            }
+        ];
+    }
+
     const client = await getGoogleReviewsClient();
     if (!client) {
         throw new Error("Google Client not initialized");
@@ -118,11 +145,17 @@ export async function listReviews(accountId: string, locationId: string) {
 }
 
 /**
- * 口コミに返信する
+ * 口コミに返信する (Mock / Real 切り替え対応)
  * @param reviewName 'accounts/X/locations/Y/reviews/Z'
  * @param replyText 返信本文
  */
 export async function replyToReview(reviewName: string, replyText: string) {
+    // シミュレーターモード
+    if (reviewName.includes("mock-account-id")) {
+        console.log(`[Mock API] Reply posted to ${reviewName}: ${replyText}`);
+        return { comment: replyText, updateTime: new Date().toISOString() };
+    }
+
     const client = await getGoogleReviewsClient();
     if (!client) {
         throw new Error("Google Client not initialized");

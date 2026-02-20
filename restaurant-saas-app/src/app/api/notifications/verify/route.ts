@@ -46,9 +46,13 @@ export async function POST(request: Request) {
                 expiresAt.setMinutes(expiresAt.getMinutes() + SMS_OTP_EXPIRES_MINUTES);
             }
 
-            // 4. Store in Firestore (users/{uid}/verifications/{channel})
-            await adminDb.collection("users").doc(uid).collection("verifications").doc(channel).set({
+            // 4. Store in Firestore (Root collection for easier cross-uid search if needed, or consistent with confirm endpoint)
+            const { getDbForUser } = await import("@/lib/firebase-admin");
+            const db = await getDbForUser(uid);
+            await db.collection("verificationCodes").doc(`${uid}_${channel}`).set({
                 token,
+                userId: uid,
+                channel,
                 contactValue: contact_value,
                 expiresAt,
                 verified: false,
@@ -58,7 +62,7 @@ export async function POST(request: Request) {
             // 5. Send Notification (Mock/Placeholder)
             if (channel === "email") {
                 const origin = request.headers.get("origin") || "http://localhost:3000";
-                const confirmUrl = `${origin}/api/notifications/verify/confirm?token=${token}&uid=${uid}`;
+                const confirmUrl = `${origin}/api/notifications/verify/confirm?token=${token}&channel=email`;
                 console.log(`[Email Mock] to=${contact_value}, url=${confirmUrl}`);
             } else {
                 console.log(`[SMS Mock] to=${contact_value}, OTP=${token}`);

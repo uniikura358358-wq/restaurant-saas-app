@@ -4,7 +4,7 @@
  * stores/{uid}/usage/{YYYY-MM} ドキュメントと連携し、月間SMS送信数の管理を行う。
  */
 
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, getDbForUser } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import {
     StoreUsageDoc,
@@ -38,7 +38,8 @@ export async function getUsageRecord(
     storeId: string // in MVP, storeId = uid
 ): Promise<StoreUsageDoc> {
     const usageMonth = getCurrentMonth();
-    const docRef = adminDb
+    const db = await getDbForUser(storeId);
+    const docRef = db
         .collection("stores")
         .doc(storeId)
         .collection("usage")
@@ -94,7 +95,8 @@ export async function incrementSmsCount(
     storeId: string
 ): Promise<number> {
     const usageMonth = getCurrentMonth();
-    const docRef = adminDb
+    const db = await getDbForUser(storeId);
+    const docRef = db
         .collection("stores")
         .doc(storeId)
         .collection("usage")

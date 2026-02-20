@@ -16,7 +16,7 @@
   - [x] **HP Usage Guide**: Implemented step-by-step lecture for Image Upload, Menu Update, and Daily Menu (Phase 16).
 - [x] 日報・ダッシュボード更新
   - [x] `Dashboard.md` の更新
-  - [x] 日報の作成
+  - [x] 日報の作成と統合 (2026-02-18)
 - [x] 依存関係のセットアップ
   - [x] `@google-cloud/vertexai` のインストール 初期化エラー抑制
   - [x] 管理者コンソールの操作性改善 (ドラッグ、Premium対応、タイポ修正)
@@ -99,8 +99,86 @@
 - [x] **Phase 18: Plan Gating & Navigation Optimization** `[x]`
   - [x] `usePlanGuard` ロジックの修正（名称一部一致での判定へ）
   - [x] ツール単体プランとWEBプランの分離（サイドバーの出し分け）
+  - [x] 会計ダッシュボード：横棒グラフの視認性向上（バーの太さを32pxに拡大、リスト形式へ最適化）
+  - [x] 会計ダッシュボード：期間選択ボタンの名称正式化（「曜日別(今年)」等）
+  - [x] 会計ダッシュボード：Airレジ/Square連携セクションの新設（マネタイズ導線の実装）
+  - [x] 会計ダッシュボード：売上入力エリアのUI重要度向上（文字サイズ3倍、アイコン拡大）
+  - [x] 会計ダッシュボード：同期実行ボタンの機能実装（擬似同期ロジックとトースト通知）
+  - [ ] プレミアム機能：AIによるリピーター離脱予測エンジンのプロトタイプ作成
+  - [ ] 設定画面：各POSレジAPI連携の認証フロー実装
 - [x] **Troubleshooting**: メモリ異常消費プロセスの特定と強制終了 (検証スクリプトのハングアップ解消)
 - [x] **Phase 20: Project Cleanup** `[x]`
   - [x] 不要な検証用スクリプト（scripts/）13ファイルの削除
   - [x] 旧環境（supabase/）ディレクトリの完全削除
   - [x] 削除に伴うインポート・型不備の解消とビルド正常化
+- [x] **Phase 8: AI Stability & Model Governance** `[x]`
+  - [x] **Model Policy**: 全システムにおいて Flash モデル優先（運用規則）を徹底適用。
+  - [x] **Resilience**: 503/429エラー時の即時フォールバックロジックを API ルートに実装。
+  - [x] **Cost Optimization**: モデル単価の下落（Pro ➔ Flash）に合わせて利用状況計算を上方修正（0.86円 ➔ 0.1円）。
+- [x] **Phase 21: Multi-Project Connectivity & Reliability** `[x]`
+  - [x] **Troubleshooting**: `5 NOT_FOUND` エラーの原因をプロジェクトID不一致と特定。
+  - [x] **Connectivity**: `FIREBASE_SERVICE_ACCOUNT_KEY_SECONDARY` による 2026 年度新プロジェクトの統合。
+  - [x] **Dynamic Routing**: `getDbForUser` 実装により、UID に応じて適切なプロジェクト DB へ自動接続。
+  - [x] **Fallback Auth**: 2 つの Firebase プロジェクトを跨ぐ ID トークン検証ロジックを `verifyAuth` に実装。
+  - [x] **Module Integration**:
+    - [x] **Webhooks**: Stripe/Whop Webhookのマルチプロジェクト横断検索を実装。
+    - [x] **API Routes**: Settings (GET/SAVE), Reviews (SYNC/SUBMIT/RESET), Quota Check, Notification Verify の全マルチプロジェクト化。
+    - [x] **Server Actions**: Dashboard, Settings アクションの統合。
+  - [x] **UI/UX Enhancement**:
+    - [x] **Sidebar Badge**: 「口コミ一覧」に未返信件数を示す動的バッジを実装。
+    - [x] **Smart Textarea**: AI返信案のプレビューエリアが文字数に合わせて自動で伸びるよう改善。
+    - [x] **Store Instagram Tab**: 店舗設定内にガイド付きカメラ機能（フィード/ストーリー）を統合。ツール会員（Pro）も利用可能に。
+  - [x] **AI Logic Optimization**:
+    - [x] **Emoji Strategies**: 絵文字レベル（控えめ/普通/多め）を飲食店向けに再定義し、10個以上の装飾モードを搭載。
+    - [x] **Contextual Variety**: 和食・洋食・カフェなどの業態に応じた絵文字の自動使い分けを強化。
+- [ ] **Google審査用デモ動画の最終仕上げ（字幕実装）**
+  - `scripts/generate-demo-video.ts` にブラウザ上のリアルタイム字幕表示ロジックを追加し、編集いらずのデモ動画を再撮影する。
+- [x] **Phase 22: AI経営・事務管理機能の基盤構築**
+  - [x] **Step 1: 店舗基本設定 UI の実装**
+    - `src/app/settings/store/page.tsx` に「基本情報」タブを新設。
+    - 営業時間、席数、目標原価率の入力フォームを「見やすさ重視」で作成。
+  - [x] **Step 2: Firestore データ連携**
+    - `stores/{storeId}/business_config` への保存ロジック（Server Action）の実装。
+- [x] **Phase 23: 会計ダッシュボードと書類アップロード機能の実装**
+  - [x] **Step 1: 経営・事務管理ページの親画面作成**
+    - [x] `/dashboard/accounting` ページを新設。
+    - [x] 「売上入力」「書類を撮る」等のクイックアクションボタンのナビゲーション不備を修正。
+    - [x] 「PCから選ぶ」を「出力・管理(PC)」へ刷新し、スマホ非表示（PC専用）に設定。
+    - [x] 多機能分析ボードへの刷新：ランチ/ディナー売上、回転率、坪単価などのメトリクス切り替え。
+    - [x] 表示形式（金額/％）およびグラフ形状（縦棒/横棒/折れ線）の動的切り替え機能を実装。
+    - [x] 全メトリクスが指定期間（1M〜2Y）と連動して個別表示される高度なフィルタリングシステムを構築。
+    - [x] グラフ表示の精密化：超極細ライン（1px）、ドット・コネクト（SVG同期）、ラベル重複回避（Skipping）ロジックの完全実装。
+    - [x] **Dashboard Date Range Filters**: 「今月」「先月」「今年」「前年」および「曜日別(今年/前年)」の期間選択ボタンを追加し、暦・曜日通りの集計ロジックを実装。(Done: 2026-02-19)
+  - [x] **Step 2: 書類撮影・アップロード UI (Mobile優先)**
+    - [x] ガイド付きカメラによる納品書・請求書の撮影機能（ framing guide, animation ）。
+    - [x] アルバム（ファイル選択）からのアップロード・解析対応。
+  - [x] **Step 3: Gemini による OCR 解析ロジック**
+    - [x] 写真から店名・金額・日付・インボイス番号を自動抽出する API の実装。
+    - [x] 解析結果のプレビューおよび仕訳登録完了までのシームレスなUI統合。
+- [x] **Phase 19: AI POP Maker Enhancement (Canva Integration) & Cloud Migration** `[x]`
+  - [x] **Templates Directory**: Created `public/images/templates/pop/` for high-quality Canva assets.
+  - [x] **Template Sorting**: 40枚以上の混在テンプレートをアスペクト比に基づき自動仕分け。
+  - [x] **Pro Category**: Added "Pro-only" style category to UI.
+  - [x] **Layout Engine**: Implemented `PRO_LAYOUT_CONFIG` for precise text positioning.
+  - [x] **Render Logic**: Completed `renderPro` with support for image background + AI text overlays.
+  - [x] **Cloud Migration**: Firebase Storage への画像移行ツール (`/api/migrate`) の実装とUIのクラウドURL化。
+- [x] **PCメモリ・ディスク軽量化**
+  - [x] 不要パッケージ（playwright, radix-ui, opentelemetry等）の削除。
+  - [x] ブラウザバイナリおよびビルドキャッシュのクリーンアップ。
+
+---
+
+### 過去の個別UI・機能改善タスク（task.mdより統合）
+
+- [x] **料金・プラン表示の細部調整**
+  - 年払い選択時の「17%お得！」バッジ表示およびアニメーション実装。
+  - 支払切替スイッチの15%拡大による操作性向上。
+  - 通貨記号（¥）と金額の間の余白調整。
+  - WEBライトプラン「日替わり自動更新機能搭載」等の訴求文言追加。
+- [x] **バナー・ナビゲーション改善**
+  - HP制作パッケージ（View B）への「見本のWEBサイトを見る」ボタン追加。
+  - View A/B 両方への初期費用バナー追加と区分明確化。
+  - 「プラン選択に戻る」ボタンを大型化（2倍）、青色、fixed配置へ改善。
+- [x] **ブランド刷新対応**
+  - `usePlanGuard.ts` 等のプラン名称定数の置換と正規化。
+  - Whop/Instagram 等の外部連携プラン識別子の同期。

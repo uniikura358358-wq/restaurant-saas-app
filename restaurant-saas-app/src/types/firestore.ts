@@ -157,3 +157,22 @@ export interface StoreData {
 
     updatedAt: Timestamp | Date;
 }
+
+/**
+ * stores/{uid}/accounting_entries/{entryId}
+ * 会計・領収書の解析データ
+ */
+export interface AccountingEntry {
+    id: string;
+    userId: string;
+    merchantName: string;
+    totalAmount: number;
+    transactionDate: string;
+    category: string;
+    invoiceNumber?: string;
+    taxAmount?: number;
+    imageUrl?: string; // 保存された画像のURL
+    status: "pending" | "confirmed";
+    createdAt: Timestamp | Date;
+    updatedAt: Timestamp | Date;
+}

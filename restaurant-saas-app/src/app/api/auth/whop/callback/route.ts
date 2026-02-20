@@ -57,51 +57,59 @@ export async function GET(request: Request) {
         const planName = hasBusiness ? 'Business' : (hasLight ? 'Light' : 'web Light');
 
         // 4. Update or Create User in Firebase (Linking Whop to Firebase)
+        const { adminAuthSecondary, getDbForUser } = await import('@/lib/firebase-admin');
 
         let uid = "";
         let isNewUser = false;
+        let activeAuth = adminAuth; // Default to primary
 
         try {
+            // Try primary first
             const userRecord = await adminAuth.getUserByEmail(whopUser.email);
             uid = userRecord.uid;
+            activeAuth = adminAuth;
         } catch (error: any) {
             if (error.code === 'auth/user-not-found') {
-                // New user registration flow
-                const newUser = await adminAuth.createUser({
-                    email: whopUser.email,
-                    emailVerified: true,
-                    // password is not set, meaning they can't sign in with password unless they set it.
-                    // Ideally we'd link providers or use custom token but for now this syncs the account.
-                });
-                uid = newUser.uid;
-                isNewUser = true;
+                try {
+                    // Try secondary
+                    const userRecord = await adminAuthSecondary.getUserByEmail(whopUser.email);
+                    uid = userRecord.uid;
+                    activeAuth = adminAuthSecondary;
+                } catch (secError: any) {
+                    if (secError.code === 'auth/user-not-found') {
+                        // Create in SECONDARY (assuming it's the new project/default for others)
+                        const newUser = await adminAuthSecondary.createUser({
+                            email: whopUser.email,
+                            emailVerified: true,
+                        });
+                        uid = newUser.uid;
+                        activeAuth = adminAuthSecondary;
+                        isNewUser = true;
+                    } else {
+                        throw secError;
+                    }
+                }
             } else {
                 throw error;
             }
         }
 
-        // Sync Plan to Profile (Firestore)
-        // users/{uid}
-        await adminDb.collection('users').doc(uid).set({
+        // 5. Sync Plan to Profile (Firestore)
+        const db = await getDbForUser(uid);
+        await db.collection('users').doc(uid).set({
             email: whopUser.email,
             whopId: whopUser.id,
             plan: planName.toLowerCase(), // 'business' | 'light' | 'web light'
             subscriptionStatus: planStatus,
-            planName: planName, // deprecated but keep for compatibility if needed
+            planName: planName,
             updatedAt: FieldValue.serverTimestamp(),
-            lastLoginAt: FieldValue.serverTimestamp(), // To indicate activity
+            lastLoginAt: FieldValue.serverTimestamp(),
         }, { merge: true });
 
-        // 5. Create a Custom Token for the user to sign in on client
-        const customToken = await adminAuth.createCustomToken(uid, {
+        // 6. Create a Custom Token for the user to sign in on client (using the correct Auth instance)
+        const customToken = await activeAuth.createCustomToken(uid, {
             plan: planName.toLowerCase()
         });
-
-        // Redirect to dashboard with custom token to sign in
-        // Note: Passing token in URL is a security risk (could be logged).
-        // A better way is to set a secure cookie or use an intermediate page.
-        // For this specific migration/MVP, we'll pass it in query param to be handled by client immediately.
-        // Client side `useAuth` or a special `/auth/callback` page should `signInWithCustomToken(token)`.
 
         return NextResponse.redirect(`${origin}/login/callback?token=${customToken}`);
 

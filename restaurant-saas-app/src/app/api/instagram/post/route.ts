@@ -21,7 +21,9 @@ export async function POST(request: Request) {
         const uid = user.uid;
 
         // 2. プラン権限チェック
-        const userDoc = await adminDb.collection("users").doc(uid).get();
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
+        const userDoc = await db.collection("users").doc(uid).get();
         if (!userDoc.exists) {
             return NextResponse.json({ error: "ユーザー情報が見つかりません" }, { status: 404 });
         }
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
             const postId = await postToInstagram(imageUrl, caption);
 
             // 5. 投稿ログの保存
-            await adminDb.collection("users").doc(uid).collection("instagram_posts").add({
+            await db.collection("users").doc(uid).collection("instagram_posts").add({
                 postId,
                 imageUrl,
                 caption,

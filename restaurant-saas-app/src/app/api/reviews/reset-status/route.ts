@@ -10,20 +10,12 @@ export async function POST(request: Request) {
         const { reviewId } = body;
 
         // 1. Authentication
-        const authHeader = request.headers.get("Authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const { verifyAuth } = await import("@/lib/auth-utils");
+        const user = await verifyAuth(request);
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const idToken = authHeader.split("Bearer ")[1];
-
-        let decodedToken;
-        try {
-            decodedToken = await adminAuth.verifyIdToken(idToken);
-        } catch (e) {
-            console.error("Token verification failed:", e);
-            return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-        }
-        const uid = decodedToken.uid;
+        const uid = user.uid;
 
         if (!reviewId) {
             return NextResponse.json(
@@ -33,7 +25,9 @@ export async function POST(request: Request) {
         }
 
         // 2. Ownership Check & Reset Status (Firestore)
-        const reviewRef = adminDb.collection("reviews").doc(reviewId);
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
+        const reviewRef = db.collection("reviews").doc(reviewId);
         const reviewDoc = await reviewRef.get();
 
         if (!reviewDoc.exists) {
@@ -56,8 +50,8 @@ export async function POST(request: Request) {
 
         // 4. Update Stats (Optional but recommended for consistency)
         try {
-            const statsRef = adminDb.collection("users").doc(uid).collection("stats").doc("current");
-            await adminDb.runTransaction(async (t) => {
+            const statsRef = db.collection("users").doc(uid).collection("stats").doc("current");
+            await db.runTransaction(async (t) => {
                 const statsDoc = await t.get(statsRef);
                 if (statsDoc.exists) {
                     t.update(statsRef, {

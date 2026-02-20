@@ -1,4 +1,4 @@
-import { adminAuth } from "@/lib/firebase-admin";
+import { adminAuth, adminAuthSecondary } from "@/lib/firebase-admin";
 
 export interface AuthenticatedUser {
     uid: string;
@@ -8,36 +8,48 @@ export interface AuthenticatedUser {
 
 /**
  * Verifies the Firebase ID Token from the Authorization header.
- * @param request The incoming Request object
- * @returns The authenticated user's UID and other info, or null if verification fails.
+ * 2つのプロジェクト（Primary/Secondary）の両方をチェックします。
  */
-export async function verifyAuth(request: Request): Promise<AuthenticatedUser | null> {
-    const authHeader = request.headers.get("Authorization");
+export async function verifyAuth(requestOrToken: Request | string): Promise<AuthenticatedUser | null> {
+    let idToken: string | null = null;
 
-    if (!authHeader?.startsWith("Bearer ")) {
+    if (typeof requestOrToken === "string") {
+        idToken = requestOrToken;
+    } else {
+        const authHeader = requestOrToken.headers.get("Authorization");
+        if (authHeader?.startsWith("Bearer ")) {
+            idToken = authHeader.split("Bearer ")[1];
+        }
+    }
+
+    if (!idToken) {
         return null;
     }
 
-    const idToken = authHeader.split("Bearer ")[1];
-
-    // 開発環境かつデモトークンの場合はバイパス
-    if (process.env.NODE_ENV === "development" && idToken === "demo-token") {
-        console.log("verifyAuth: Demo token detected, bypassing Firebase Admin Auth.");
-        return {
-            uid: "demo-user-id",
-            email: "demo@example.com",
-        };
+    // 1. デモトークンのチェック (バイパス)
+    if (idToken === "demo-token") {
+        return { uid: "demo-user-id", email: "demo@example.com" };
     }
 
+    // 2. プライマリ・プロジェクトで検証
     try {
-        console.log("verifyAuth: Verifying ID token with Firebase Admin...");
-        const decodedToken = await adminAuth.verifyIdToken(idToken);
-        return {
-            uid: decodedToken.uid,
-            email: decodedToken.email,
-        };
-    } catch (error) {
-        console.error("verifyAuth: Token verification failed:", error);
-        return null;
+        if (typeof adminAuth.verifyIdToken === 'function') {
+            const decodedToken = await adminAuth.verifyIdToken(idToken);
+            return { uid: decodedToken.uid, email: decodedToken.email };
+        }
+    } catch (error: any) {
+        console.warn("Primary Auth failed, trying secondary...");
     }
+
+    // 3. セカンダリ・プロジェクトで再検証
+    try {
+        if (typeof adminAuthSecondary.verifyIdToken === 'function') {
+            const decodedToken = await adminAuthSecondary.verifyIdToken(idToken);
+            return { uid: decodedToken.uid, email: decodedToken.email };
+        }
+    } catch (error: any) {
+        console.error("verifyAuth: All token verification failed:", error.message);
+    }
+
+    return null;
 }

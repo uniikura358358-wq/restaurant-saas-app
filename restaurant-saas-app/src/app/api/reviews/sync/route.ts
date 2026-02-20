@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, getDbForUser } from "@/lib/firebase-admin";
 import { verifyAuth } from "@/lib/auth-utils";
 import { listReviews, mapGoogleReviewToFirestore } from "@/lib/google-business-profile";
 import { FieldValue } from "firebase-admin/firestore";
@@ -20,8 +20,20 @@ export async function POST(request: Request) {
 
         const uid = user.uid;
 
-        // 2. 店舗設定から gbpAccountId, gbpLocationId を取得
-        const storeDoc = await adminDb.collection("stores").doc(uid).get();
+        // 【デモユーザーガード】Firestore/GBP設定不備によるエラーを回避
+        if (uid === "demo-user-id") {
+            return NextResponse.json({
+                success: true,
+                message: "3 件の新しい口コミを取り込みました (Demo Mode)",
+                count: 3
+            });
+        }
+
+        // 2. 適切な DB インスタンスを取得
+        const db = await getDbForUser(uid);
+
+        // 3. 店舗設定から gbpAccountId, gbpLocationId を取得
+        const storeDoc = await db.collection("stores").doc(uid).get();
         if (!storeDoc.exists) {
             return NextResponse.json({ error: "店舗情報が見つかりません" }, { status: 404 });
         }
@@ -35,20 +47,20 @@ export async function POST(request: Request) {
             }, { status: 400 });
         }
 
-        // 3. GBP API から口コミ一覧を取得
+        // 4. GBP API から口コミ一覧を取得
         const rawReviews = await listReviews(gbpAccountId, gbpLocationId);
 
         if (!rawReviews || rawReviews.length === 0) {
             return NextResponse.json({ message: "新しい口コミはありませんでした", count: 0 });
         }
 
-        // 4. Firestore への保存（重複チェック込み）
+        // 5. Firestore への保存（重複チェック込み）
         let newCount = 0;
         let unrepliedIncrement = 0;
         let repliedIncrement = 0;
 
-        const batch = adminDb.batch();
-        const reviewsCollection = adminDb.collection("reviews");
+        const batch = db.batch();
+        const reviewsCollection = db.collection("reviews");
 
         for (const rawReview of rawReviews) {
             const firestoreReview = mapGoogleReviewToFirestore(rawReview, uid, uid); // MVP: uid = storeId
@@ -59,7 +71,7 @@ export async function POST(request: Request) {
             if (!existingDoc.exists) {
                 batch.set(reviewRef, {
                     ...firestoreReview,
-                    publishedAt: FieldValue.serverTimestamp(), // または Date
+                    publishedAt: FieldValue.serverTimestamp(),
                     fetchedAt: FieldValue.serverTimestamp(),
                     updatedAt: FieldValue.serverTimestamp(),
                 });
@@ -67,14 +79,12 @@ export async function POST(request: Request) {
                 if (firestoreReview.status === "unreplied") unrepliedIncrement++;
                 else repliedIncrement++;
             } else {
-                // 既存の場合、ステータスのみ更新（Google側で返信された場合など）
                 const existingData = existingDoc.data();
                 if (existingData?.status !== firestoreReview.status) {
                     batch.update(reviewRef, {
                         status: firestoreReview.status,
                         updatedAt: FieldValue.serverTimestamp(),
                     });
-                    // 統計更新用
                     if (firestoreReview.status === "replied") {
                         unrepliedIncrement--;
                         repliedIncrement++;
@@ -86,9 +96,9 @@ export async function POST(request: Request) {
             }
         }
 
-        // 5. 統計情報 (stats/current) の更新
+        // 6. 統計情報 (stats/current) の更新
         if (newCount > 0 || unrepliedIncrement !== 0 || repliedIncrement !== 0) {
-            const statsRef = adminDb.collection("users").doc(uid).collection("stats").doc("current");
+            const statsRef = db.collection("users").doc(uid).collection("stats").doc("current");
             batch.set(statsRef, {
                 totalReviews: FieldValue.increment(newCount),
                 unrepliedCount: FieldValue.increment(unrepliedIncrement),

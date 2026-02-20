@@ -24,9 +24,9 @@ export async function GET(request: Request) {
 
     const modelConfigs = [
         { label: "Gemini 3 Pro (High Reasoning)", id: "gemini-3-pro-preview", thinking: "HIGH" },
-        { label: "Gemini 3 Flash (Fast Reasoning)", id: "gemini-3-flash-preview", thinking: "LOW" },
-        { label: "Gemini 2.5 Flash (Stable)", id: "gemini-2.5-flash", thinking: null },
-        { label: "Gemini 2.0 Flash (Legacy)", id: "gemini-2.0-flash-001", thinking: null }
+        { label: "Gemini 3 Flash (Sub/Fast)", id: "gemini-3-flash-preview", thinking: "LOW" },
+        { label: "Gemini 2.5 Flash (Main/Stable)", id: "gemini-2.5-flash", thinking: null },
+        { label: "Gemini 2.0 Flash (New/Fast)", id: "gemini-2.0-flash", thinking: null }
     ];
 
     const results: any[] = [];

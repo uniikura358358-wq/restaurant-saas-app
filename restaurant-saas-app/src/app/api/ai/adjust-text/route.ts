@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { text, model: requestedModel } = body;
 
-        const modelName = requestedModel || 'gemini-1.5-flash';
+        const modelName = requestedModel || 'gemini-2.5-flash';
         console.log(`[AI Adjust] Using Vertex AI model: ${modelName}, Input: ${text}`);
 
         const model = getGenerativeModel(modelName);

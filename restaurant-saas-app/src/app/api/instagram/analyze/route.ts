@@ -10,24 +10,14 @@ type SystemConfigRow = {
     value: string;
 };
 
-const DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_FALLBACK_MODEL = "gemini-3-flash-preview";
 const ANALYZE_TIMEOUT_MS = 20_000;
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
 const ALLOWED_PLANS = ['standard', 'business', 'premium', 'pro'];
 
-async function getActiveModelName() {
-    try {
-        const doc = await adminDb.collection("system_config").doc("active_ai_model").get();
-        if (!doc.exists) {
-            return "gemini-1.5-flash";
-        }
-        return doc.data()?.value || "gemini-1.5-flash";
-    } catch (error) {
-        console.warn("DB fetch failed for model name (using default):", error);
-        return "gemini-1.5-flash";
-    }
-}
+// 運用規則に基づき 2.5 Flash をメインで使用
+const DEFAULT_AI_MODEL = "gemini-2.5-flash";
 
 function extractJsonObject(text: string) {
     const trimmed = text.trim();
@@ -50,27 +40,20 @@ function extractJsonObject(text: string) {
 
 export async function POST(request: Request) {
     try {
-        // Vertex AI ではサービスアカウント認証のため必須ではない
-        const apiKey = process.env.GOOGLE_API_KEY?.trim();
-
         // ユーザー認証チェック
-        const authHeader = request.headers.get("Authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const { verifyAuth } = await import("@/lib/auth-utils");
+        const user = await verifyAuth(request);
+        if (!user) {
             return NextResponse.json({ error: "認証されていません" }, { status: 401 });
         }
-        const idToken = authHeader.split("Bearer ")[1];
-        let decodedToken;
-        try {
-            decodedToken = await adminAuth.verifyIdToken(idToken);
-        } catch (e) {
-            return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-        }
-        const uid = decodedToken.uid;
+        const uid = user.uid;
 
         // プラン権限チェック (バックエンド側の防衛線)
-        let userPlan = "standard"; // デフォルトで解析を許可するプランに設定
+        let userPlan = "standard";
         try {
-            const userDoc = await adminDb.collection("users").doc(uid).get();
+            const { getDbForUser } = await import("@/lib/firebase-admin");
+            const db = await getDbForUser(uid);
+            const userDoc = await db.collection("users").doc(uid).get();
             const userData = userDoc.data();
             userPlan = (userData?.plan || userData?.planName || 'Standard').toLowerCase();
         } catch (dbError) {
@@ -102,83 +85,91 @@ export async function POST(request: Request) {
         const arrayBuffer = await file.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-        const modelName = await getActiveModelName();
-        const model = getGenerativeModel(modelName);
+        const targetModels = [DEFAULT_AI_MODEL, DEFAULT_FALLBACK_MODEL];
+        let responseText: string | null = null;
+        let lastError: any = null;
 
-        const prompt =
-            "この料理の画像を分析し、Instagram投稿のキャプション生成に役立つ情報を抽出してください。以下のJSON形式でのみ出力すること。\n" +
-            "{\n" +
-            '  "dish_name": "具体的な料理名（例: 濃厚魚介豚骨ラーメン）",\n' +
-            '  "visual_features": "見た目の特徴、シズル感（例: 湯気が立っている、チャーシューが分厚い、スープが濃厚そう）",\n' +
-            '  "key_ingredients": ["主要食材1", "主要食材2"],\n' +
-            '  "suggested_hashtags_base": ["料理カテゴリ", "利用シーン"]\n' +
-            "}";
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
-
-        try {
-            const result = await Promise.race([
-                model.generateContent({
-                    contents: [
-                        {
-                            role: "user",
-                            parts: [
-                                { text: prompt },
-                                {
-                                    inlineData: {
-                                        data: base64,
-                                        mimeType,
-                                    },
-                                },
-                            ],
-                        },
-                    ],
-                }),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error("TIMEOUT")), ANALYZE_TIMEOUT_MS)
-                ),
-            ]);
-
-            const response = (result as any).response;
-            const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            const parsed = extractJsonObject(text);
-
-            if (!parsed || typeof parsed !== "object") {
-                return NextResponse.json({ error: "AIの出力がJSON形式ではありません" }, { status: 500 });
-            }
-
-            return NextResponse.json(
-                { result: parsed },
-                {
-                    headers: {
-                        "Cache-Control": "no-store",
-                    },
+        for (const modelName of targetModels) {
+            try {
+                const model = getGenerativeModel(modelName);
+                const generationConfig: any = {};
+                if (modelName.includes('gemini-3')) {
+                    generationConfig.thinking_config = { include_thoughts: false, thinking_level: 'LOW' };
                 }
-            );
-        } catch (error: unknown) {
-            if (error instanceof Error && error.message === "TIMEOUT") {
-                return NextResponse.json(
-                    { error: "通信がタイムアウトしました。電波の良い場所で再度お試しください" },
-                    { status: 504, headers: { "Cache-Control": "no-store" } }
-                );
+
+                const result = await Promise.race([
+                    model.generateContent({
+                        contents: [
+                            {
+                                role: "user",
+                                parts: [
+                                    { text: prompt },
+                                    {
+                                        inlineData: {
+                                            data: base64,
+                                            mimeType,
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                        generationConfig,
+                    }),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error("TIMEOUT")), ANALYZE_TIMEOUT_MS)
+                    ),
+                ]);
+
+                const response = (result as any).response;
+                responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                if (responseText) break;
+            } catch (error: any) {
+                console.warn(`Analyze retryable error for ${modelName}:`, error.message);
+                lastError = error;
             }
-            throw error;
-        } finally {
-            clearTimeout(timeoutId);
         }
-    } catch (error: any) {
-        console.error("Analyze Error:", error);
-        try {
-            // Try to return a valid JSON error even if build fails? 
-            // Or just return 500.
+
+        if (!responseText) {
+            throw lastError || new Error("解析結果が取得できませんでした");
+        }
+
+        const parsed = extractJsonObject(responseText);
+
+        if (!parsed || typeof parsed !== "object") {
+            return NextResponse.json({ error: "AIの出力がJSON形式ではありません" }, { status: 500 });
+        }
+
+        return NextResponse.json(
+            { result: parsed },
+            {
+                headers: {
+                    "Cache-Control": "no-store",
+                },
+            }
+        );
+    } catch (error: unknown) {
+        if (error instanceof Error && error.message === "TIMEOUT") {
             return NextResponse.json(
-                { error: "画像解析に失敗しました" },
-                { status: 500, headers: { "Cache-Control": "no-store" } }
+                { error: "通信がタイムアウトしました。電波の良い場所で再度お試しください" },
+                { status: 504, headers: { "Cache-Control": "no-store" } }
             );
-        } catch {
-            // Absolute fallback
-            return new NextResponse("Internal Server Error", { status: 500 });
         }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
     }
+} catch (error: any) {
+    console.error("Analyze Error:", error);
+    try {
+        // Try to return a valid JSON error even if build fails? 
+        // Or just return 500.
+        return NextResponse.json(
+            { error: "画像解析に失敗しました" },
+            { status: 500, headers: { "Cache-Control": "no-store" } }
+        );
+    } catch {
+        // Absolute fallback
+        return new NextResponse("Internal Server Error", { status: 500 });
+    }
+}
 }

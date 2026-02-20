@@ -251,121 +251,114 @@ const SCENARIO_SALES: Record<string, ScenarioStep> = {
 const SCENARIO_MEMBER: Record<string, ScenarioStep> = {
     start: {
         id: 'start',
-        botMessage: 'ご利用ありがとうございます！AIサポートです。管理画面の操作や設定方法についてお手伝いしましょうか？',
+        botMessage: 'ご利用ありがとうございます。飲食店経営専門のAIコンサルタントです。\n\n事務作業の効率化から、税務・財務戦略、資金繰りの改善まで、専門的な知見を持ってサポートいたします。本日はどのような戦略をご検討でしょうか？',
         options: [
-            { label: 'Google口コミAIの使い方を知りたい', nextStep: 'member_google_guide' },
-            { label: 'Instagram連携を始めたい', nextStep: 'member_insta_guide' },
-            { label: '店舗名やAIの口調を変えたい', nextStep: 'member_settings_guide' },
-            { label: '売上が上がるテクニック集', nextStep: 'member_revenue_tips' },
-            { label: 'HPの使い方ガイド（画像・メニュー更新）', nextStep: 'member_hp_guide' },
-            { label: 'プラン変更・お支払いについて', nextStep: 'member_billing_guide' },
-            { label: '口コミが同期されない・エラーが出る', nextStep: 'member_trouble' }
+            { label: 'AI会計・帳簿（新機能）の使い方', nextStep: 'member_ai_accounting_guide' },
+            { label: 'インボイス用シートをAIで作る', nextStep: 'member_tax_invoice_sheet' },
+            { label: '税務・確定申告の相談', nextStep: 'member_tax_consultant' },
+            { label: '財務・経営分析の相談', nextStep: 'member_finance_consultant' },
+            { label: 'Google/SNS集客の強化', nextStep: 'member_marketing_tips' },
+            { label: '設定・トラブル解決', nextStep: 'member_trouble' }
         ]
     },
-    member_google_guide: {
-        id: 'member_google_guide',
-        botMessage: 'Google口コミAIでは、「返信案の作成」と「自動返信」の2つの使い方ができます。\n\n1. **返信案の作成**: ダッシュボードの「未返信」タブから口コミを選び、「AI返信案を作成」を押してください。\n2. **自動返信**: 店舗設定の「Google口コミ」タブで「自動返信」を有効にすると、AIが自動で返信するようになります。',
+    // --- 新機能：AI会計カテゴリ ---
+    member_ai_accounting_guide: {
+        id: 'member_ai_accounting_guide',
+        botMessage: '最新の「AI事務管理」機能についてご説明します。この機能は、オーナー様が経理作業を一切行わない世界を目指しています。\n\n1. **AI書類仕訳**: カメラや音声での入力をAIが解析。勘定科目の判定から帳簿への転記まで自動で行います。\n2. **デジタル・キャビネット**: 全書類がAIによって「食材」「光熱費」等に自動フォルダ分け。検索も一瞬です。\n3. **収支・帳簿**: 売上と経費から損益(P/L)をリアルタイム算出。確定申告の準備率も可視化されます。\n4. **CSVエクスポート**: freeeやマネフォ形式で出力。即座に公式帳簿として連携可能です。',
         options: [
-            { label: '自動返信の設定場所は？', nextStep: 'member_settings_guide' },
+            { label: 'AI仕訳のコツを知りたい', nextStep: 'member_ai_ocr_tips' },
+            { label: '会計ソフトとの連携方法', nextStep: 'member_csv_guide' },
             { label: '最初に戻る', nextStep: 'start' }
         ]
     },
-    member_insta_guide: {
-        id: 'member_insta_guide',
-        botMessage: 'Instagram連携（Proプラン以上）では、AIが投稿文やハッシュタグを自動生成します。\n\n店舗設定の「Instagram」タブからアカウントを連携してください。連携後は、写真をアップロードするだけでAIが魅力的な投稿案を作成します！',
-        options: [
-            { label: '自分のプランを確認する', nextStep: 'member_billing_guide' },
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    member_settings_guide: {
-        id: 'member_settings_guide',
-        botMessage: '店舗情報の変更やAIのキャラクター設定は、「店舗設定」メニューから行えます。\n\n・**基本情報**: 店舗名や署名（店長、オーナー等）\n・**AIトーン**: 丁寧、フレンドリー、元気などの使い分け\n・**返信テンプレート**: 星の数に応じたベース文章の編集\n\n左メニューの「店舗設定」をクリックしてください。',
+    member_ai_ocr_tips: {
+        id: 'member_ai_ocr_tips',
+        botMessage: 'AIの精度を最大化するためのプロのコツです。\n\n1. **音声入力**: 「佐藤精肉店で3000円」と店名を合わせると、AIが過去のデータと照合し、より正確に仕訳けます。\n2. **カメラ撮影**: レシートは平らにして。影が入らないように撮ると、AIが電話番号から事業者を特定し、勘定科目を100%の精度で選び出します。\n3. **修正学習**: AIが間違えた場合、一度手動で修正いただければ、次回からはその仕訳をAIが「学習」します。',
         options: [
             { label: '最初に戻る', nextStep: 'start' }
         ]
     },
-    member_billing_guide: {
-        id: 'member_billing_guide',
-        botMessage: '現在のプラン確認やアップグレードは「プラン一覧」ページから行えます。\n領収書の発行や支払い情報の変更（Stripe）についても、プラン一覧から管理画面にアクセスいただけます。',
+    member_csv_guide: {
+        id: 'member_csv_guide',
+        botMessage: '外部会計ソフトとの連携手順です。\n\n1. 「収支・帳簿」タブの最下部にある「会計ソフト用データ出力」へ移動します。\n2. freeeまたはマネーフォワードのボタンを押し、専用ファイルをダウンロードします。\n3. 会計ソフト側の「インポート機能」でそのファイルを選択するだけで、月次の処理が完了します。\n※将来的にAPIによる完全自動同期も開放予定です。',
         options: [
-            { label: 'プラン一覧ページへ', nextStep: 'action_open_plans' },
+            { label: 'インボイス用のシートも欲しい', nextStep: 'member_tax_invoice_sheet' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    member_tax_invoice_sheet: {
+        id: 'member_tax_invoice_sheet',
+        botMessage: 'インボイス制度に完全準拠した「AIカスタム帳簿（スプレッドシート形式）」を作成します。これにはT番号の照合履歴、税率ごとの自動集計、そして電子帳簿保存法に対応したインデックスが含まれます。\n\n「収支・帳簿」タブの出力セクションにある「AIカスタム帳簿 (Excel/Sheet)」ボタンから、いつでも最新の状態を書き出せます。今すぐ場所を確認しますか？',
+        options: [
+            { label: '出力場所を見る', nextStep: 'member_ai_accounting_guide' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    // --- 専門領域：税務コンサル ---
+    member_tax_consultant: {
+        id: 'member_tax_consultant',
+        botMessage: '税務戦略についてのアドバイスです。飲食店に特化した節税や確定申告のポイントをお伝えします。\n\n何を詳しくお聞きになりたいですか？',
+        options: [
+            { label: '青色申告65万控除の条件', nextStep: 'tax_blue_declaration' },
+            { label: '経費になる「まかない」や「交際費」', nextStep: 'tax_expenses' },
+            { label: '自宅兼店舗の「家事按分」', nextStep: 'tax_proportion' },
+            { label: '消費税のインボイス対応', nextStep: 'tax_invoice' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    tax_blue_declaration: {
+        id: 'tax_blue_declaration',
+        botMessage: '青色申告特別控除（最大65万円）を受けるための必須条件です。\n\n1. **複式簿記での記帳**: 当アプリのAI仕訳がこれを強力にサポートします。\n2. **e-Taxでの提出**: 当アプリから書き出したCSVを会計ソフト経由で送信すれば達成可能です。\n3. **期限内申告**: ダッシュボードの「確定申告準備状況」をチェックし、常に80%以上を維持しましょう。',
+        options: [
+            { label: '他の税務相談を見る', nextStep: 'member_tax_consultant' }
+        ]
+    },
+    tax_expenses: {
+        id: 'tax_expenses: ',
+        botMessage: '飲食店の経費判断は非常に重要です。\n\n1. **まかない**: 原価の半分以上を従業員が負担し、かつ月3500円(税抜)以下なら非課税経費に。それ以外は給与扱いになるので注意。\n2. **接待交際費**: 他店の偵察（市場調査費）や、常連さんへのサービスは積極的に。ただし、1人5000円以下の飲食は「会議費」として処理した方が税務上有利な場合があります。\n3. **AIによる分類**: これらは「AI書類仕訳」時に摘要（メモ）に理由を添えると、AIが正確に分類します。',
+        options: [
+            { label: '他の税務相談を見る', nextStep: 'member_tax_consultant' }
+        ]
+    },
+    // --- 専門領域：財務コンサル ---
+    member_finance_consultant: {
+        id: 'member_finance_consultant',
+        botMessage: '財務・資金繰りの改善相談ですね。数字からお店の「健康状態」を診断します。\n\nどの指標が気になりますか？',
+        options: [
+            { label: '理想のFL比率（原価＋人件費）', nextStep: 'finance_fl_ratio' },
+            { label: '原価率30%に抑えるテクニック', nextStep: 'finance_cost_control' },
+            { label: '資金繰り（キャッシュフロー）改善', nextStep: 'finance_cashflow' },
+            { label: '最初に戻る', nextStep: 'start' }
+        ]
+    },
+    finance_fl_ratio: {
+        id: 'finance_fl_ratio',
+        botMessage: '飲食店の生命線、FL比率（Food + Labor）は**60%以下**が目標です。\n\n・F（食材原価）: 30%\n・L（人件費）: 30%\n現在、多くのお店で原材料高騰によりFが35〜40%に迫っています。人件費を下げるのが難しいため、AI活用による事務コスト（Lの一部）の削減が、利益確保の鍵となります。',
+        options: [
+            { label: '原価削減のヒント', nextStep: 'finance_cost_control' },
+            { label: '他の財務相談を見る', nextStep: 'member_finance_consultant' }
+        ]
+    },
+    finance_cashflow: {
+        id: 'finance_cashflow',
+        botMessage: '黒字倒産を防ぐための財務戦略です。\n\n1. **売上の即時把握**: POS連携で毎日のキャッシュをリアルタイム管理しましょう。\n2. **支払期限の適正化**: 可能な限りカード払いや翌月払いを活用し、手元の現金を残します。\n3. **AI予測**: 「収支・帳簿」タブで翌月の納税額を予測し、税金の支払いで慌てない準備をします。',
+        options: [
+            { label: '他の財務相談を見る', nextStep: 'member_finance_consultant' }
+        ]
+    },
+    // --- 集客・マーケティング（既存強化） ---
+    member_marketing_tips: {
+        id: 'member_marketing_tips',
+        botMessage: '集客戦略のプロフェッショナルな知見です。\n\n1. **Google MEO**: 返信は12時間以内に。AI自動返信がSEO（検索順位）を劇的に改善します。\n2. **Insta Branding**: AIが生成する「シズル感」のある投稿文で、スマホ越しの食欲を刺激しましょう。\n3. **リピーター戦略**: AIチャットを使って顧客体験を高め、来店サイクルを30日から20日に縮める施策をご相談ください。',
+        options: [
             { label: '最初に戻る', nextStep: 'start' }
         ]
     },
     member_trouble: {
         id: 'member_trouble',
-        botMessage: 'ご不便をおかけしております。\n\n・**同期されない**: ダッシュボードの「口コミを同期」ボタンを試してください。\n・**ログインエラー**: 一度ログアウトし、再度ログインをお試しください。\n・**AIが動かない**: 今月の利用枠を使い切っていないか「プラン一覧」でご確認ください。\n\n解決しない場合は、近日中に設置予定のサポート窓口までご連絡をお願いいたします。',
+        botMessage: '緊急の問題でしょうか。解決策をご案内します。\n\n・**レシートが読めない**: 明るい場所で。AIは「電話番号」が見えていれば大抵のことは解決します。\n・**連携エラー**: ブラウザのキャッシュクリアを。特にPOS連携は再認証が必要な場合があります。\n・**専門家への相談**: AIでは答えられない複雑な裁判沙汰などは、提携の専門家（税理士・弁護士）へお繋ぎします。',
         options: [
             { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    member_revenue_tips: {
-        id: 'member_revenue_tips',
-        botMessage: 'MogMogを「単なる作業効率化」ではなく「売上を伸ばす武器」として使うためのテクニック集です！\n\n具体的にどの分野の集客・売上アップに興味がありますか？',
-        options: [
-            { label: 'Google口コミで新規客を増やす', nextStep: 'tip_google_seo' },
-            { label: 'Instagramで「行きたい」を作る', nextStep: 'tip_insta_branding' },
-            { label: 'AIトーンで常連さんを増やす', nextStep: 'tip_tone_loyalty' },
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    tip_google_seo: {
-        id: 'tip_google_seo',
-        botMessage: 'Googleマップで上位に表示され、新規客を増やすコツは「返信の速さ」と「キーワード」です。\n\n1. **返信スピード**: AI自動返信を「10分〜12時間」以内に設定しましょう。Googleはアクティブな店を優先します。\n2. **キーワード**: AIは返信文に「お店の売り」を自然に盛り込みます。これにより、検索でヒットしやすくなります。\n3. **誠実さ**: 低評価にもAIが即座に誠実な返信案を作るので、炎上を防ぎつつ信頼を勝ち取れます。',
-        options: [
-            { label: '他のテクニックも見る', nextStep: 'member_revenue_tips' },
-            { label: '自動返信の設定へ', nextStep: 'member_google_guide' }
-        ]
-    },
-    tip_insta_branding: {
-        id: 'tip_insta_branding',
-        botMessage: 'Instagramの成功法則は「接触頻度」です。AIを使えば毎日5分でプロ級の投稿ができます。\n\n1. **毎日投稿**: AIが日替わりで投稿文を作るので、フォロワーの目に留まる機会が最大化されます。\n2. **シズル感のある文章**: AIが「食べてみたい！」と思わせる魅力的なフレーズを提案します。\n3. **ハッシュタグ戦略**: 最適なハッシュタグをAIが自動選定。検索からの流入を逃しません。',
-        options: [
-            { label: '他のテクニックも見る', nextStep: 'member_revenue_tips' },
-            { label: 'Instagram連携ガイド', nextStep: 'member_insta_guide' }
-        ]
-    },
-    tip_tone_loyalty: {
-        id: 'tip_tone_loyalty',
-        botMessage: '「お店のファン」を作るには、返信の「口調」が重要です。\n\n1. **キャラクター設定**: AIトーンを「フレンドリー」や「元気」に設定し、お店の雰囲気を伝えましょう。\n2. **署名機能**: 返信の末尾に「店長 ●●より」と名前を出すだけで、お客様の親近感が一気に高まります。\n3. **パーソナライズ**: AIがお客様の口コミ内容に寄り添った回答をするため、「大切にされている」と感じたお客様のリピート率が上がります。',
-        options: [
-            { label: '他のテクニックも見る', nextStep: 'member_revenue_tips' },
-            { label: 'AIトーンの設定場所は？', nextStep: 'member_settings_guide' }
-        ]
-    },
-    member_hp_guide: {
-        id: 'member_hp_guide',
-        botMessage: 'WEB会員様向け：HP更新ガイドへようこそ！\nお客様を「おっ！」と思わせるHPにするための、簡単な更新方法をレクチャーします。\n\nどの更新方法について知りたいですか？',
-        options: [
-            { label: '料理や店内の写真をアップしたい', nextStep: 'hp_step_image' },
-            { label: 'メニュー名や価格を変えたい', nextStep: 'hp_step_menu' },
-            { label: '今日の日替わりメニューを載せたい', nextStep: 'hp_step_daily' },
-            { label: '最初に戻る', nextStep: 'start' }
-        ]
-    },
-    hp_step_image: {
-        id: 'hp_step_image',
-        botMessage: '画像のアップロードはとっても簡単です！\n\n1. 左メニューの「コンテンツ管理」または各メニューの編集画面を開きます。\n2. 「画像を選択」ボタンを押し、スマホやPCから写真を選びます。\n3. **コツ**: 「1:1（正方形）」で撮影した写真を使うと、HPのレイアウトにぴったり収まり、プロ並みの仕上がりになります！',
-        options: [
-            { label: 'メニューの更新方法も見る', nextStep: 'hp_step_menu' },
-            { label: '他も見る', nextStep: 'member_hp_guide' }
-        ]
-    },
-    hp_step_menu: {
-        id: 'hp_step_menu',
-        botMessage: 'メニューの更新手順はこちらです。\n\n1. 左メニューの「メニュー管理」をクリックします。\n2. 変更したいメニューの「編集」ボタンを押します。\n3. 名前や価格を書き換えて「保存」するだけで、HPに即座に反映されます。\n\n新メニューを追加したときは、魅力的な写真も忘れずにセットしてくださいね！',
-        options: [
-            { label: '画像のコツを見る', nextStep: 'hp_step_image' },
-            { label: '他も見る', nextStep: 'member_hp_guide' }
-        ]
-    },
-    hp_step_daily: {
-        id: 'hp_step_daily',
-        botMessage: '「日替わりメニュー」は一番人気の集客機能です！\n\n1. ダッシュボードの「日替わりメニュー更新」欄に、今日の内容を入力します。\n2. 「AIでHPを更新」ボタンを押すと、AIがおいしそうなキャッチコピーを自動生成してHPを書き換えます。\n\n毎日更新することで、お客様に「このお店はいつも活気があるな」と伝えることができますよ。',
-        options: [
-            { label: '売上を上げるコツを見る', nextStep: 'member_revenue_tips' },
-            { label: '他も見る', nextStep: 'member_hp_guide' }
         ]
     }
 };
@@ -528,17 +521,26 @@ export function CustomerSupportChat() {
         // Simulate AI processing (Fallback to keyword match if not in scenario)
         setTimeout(() => {
             const lowerText = text.toLowerCase();
-            let botResponse = "申し訳ありません。その質問にはまだ正確にお答えできませんが、AIが学習を進めております。お急ぎの場合は、今後お知らせする専用メールアドレスへのお問い合わせも可能です。";
+            let botResponse = "専門的なご質問ありがとうございます。AIコンサルタントとしてさらに深い知見をご提供できるよう、具体的な状況（業態や現在の課題など）を教えていただけますでしょうか。";
             let nextOptions = SCENARIO.start.options;
 
-            // Simple Keyword Matching (Scenario-Aware)
-            if (lowerText.includes('機能') || lowerText.includes('できること')) {
+            // Professional Consultant Keyword Matching
+            if (lowerText.includes('税金') || lowerText.includes('税務') || lowerText.includes('確定申告') || lowerText.includes('節税')) {
+                botResponse = "税務戦略は利益最大化の要です。当アプリではAIが日々の支払いを帳簿化し、青色申告65万円控除を確実に狙える体制を構築します。特に「家事按分」や「飲食接待費」の適切な処理により、実質的なキャッシュフローを改善可能です。";
+                nextOptions = isAdminPath ? SCENARIO_MEMBER.member_tax_consultant.options : SCENARIO_SALES.faq_features_all.options;
+            } else if (lowerText.includes('原価') || lowerText.includes('財務') || lowerText.includes('利益') || lowerText.includes('fl')) {
+                botResponse = "飲食店の財務健全性はFL比率（Food + Labor）で決まります。目標は60%以下です。当アプリの財務分析機能を使えば、原材料高騰の中でも利益を削らないための「メニュー価格見直し」や「シフト最適化」の判断材料をリアルタイムで得られます。";
+                nextOptions = isAdminPath ? SCENARIO_MEMBER.member_finance_consultant.options : SCENARIO_SALES.faq_features_all.options;
+            } else if (lowerText.includes('ai会計') || lowerText.includes('仕訳') || lowerText.includes('帳簿') || lowerText.includes('csv') || lowerText.includes('シート') || lowerText.includes('スプレッドシート') || lowerText.includes('エクセル')) {
+                botResponse = "最新のAI事務管理機能ですね。インボイス対応の「AIカスタム帳簿（スプレッドシート）」の作成も可能です。これは単なるツールではなく、オーナー様の『自由な時間』を創出するソリューションです。レシートを撮るだけで、複式簿記の帳簿が完成し、そのままExcel形式や会計ソフトへ出力できます。";
+                nextOptions = isAdminPath ? SCENARIO_MEMBER.member_tax_invoice_sheet.options : SCENARIO_SALES.ai_tools_intro.options;
+            } else if (lowerText.includes('集客') || lowerText.includes('売上') || lowerText.includes('客数')) {
                 if (isAdminPath) {
-                    botResponse = "管理画面では、Google口コミの自動返信、Instagramの投稿作成支援、店舗情報の管理などがご利用いただけます。具体的な使い方はメニューからお選びください。";
-                    nextOptions = SCENARIO_MEMBER.start.options;
+                    botResponse = "集客最大化にはGoogleマップのSEO（MEO）が最優先です。AIによる口コミへの即時返信により、検索順位を上げ、新規客の獲得コストを最小化します。また、Instagramの投稿頻度をAIで維持することも重要です。";
+                    nextOptions = SCENARIO_MEMBER.member_marketing_tips.options;
                 } else {
-                    botResponse = SCENARIO_SALES.faq_features_all.botMessage;
-                    nextOptions = SCENARIO_SALES.faq_features_all.options;
+                    botResponse = SCENARIO_SALES.ai_tools_intro.botMessage;
+                    nextOptions = SCENARIO_SALES.ai_tools_intro.options;
                 }
             } else if (lowerText.includes('料金') || lowerText.includes('値段') || lowerText.includes('プラン')) {
                 const stepKey = isAdminPath ? 'member_billing_guide' : 'faq_plans_select';
@@ -547,29 +549,14 @@ export function CustomerSupportChat() {
                     botResponse = step.botMessage;
                     nextOptions = step.options;
                 }
-            } else if (lowerText.includes('hp') || lowerText.includes('制作')) {
+            } else if (lowerText.includes('機能') || lowerText.includes('できること')) {
                 if (isAdminPath) {
-                    botResponse = "会員様向けのHP編集機能や追加修正については、現在準備中です。恐れ入りますが、管理画面内の公式LINEから直接お問い合わせください。";
+                    botResponse = "管理画面では、AIによる全自動仕訳、財務分析、Google/SNSの集客支援、HPの管理など、飲食店経営に必要なすべての武器が揃っています。";
                     nextOptions = SCENARIO_MEMBER.start.options;
                 } else {
-                    botResponse = SCENARIO_SALES.hp_intro.botMessage;
-                    nextOptions = SCENARIO_SALES.hp_intro.options;
+                    botResponse = SCENARIO_SALES.faq_features_all.botMessage;
+                    nextOptions = SCENARIO_SALES.faq_features_all.options;
                 }
-            } else if (isAdminPath && (lowerText.includes('口コミ') || lowerText.includes('返信'))) {
-                botResponse = SCENARIO_MEMBER.member_google_guide.botMessage;
-                nextOptions = SCENARIO_MEMBER.member_google_guide.options;
-            } else if (isAdminPath && (lowerText.includes('インスタ') || lowerText.includes('insta'))) {
-                botResponse = SCENARIO_MEMBER.member_insta_guide.botMessage;
-                nextOptions = SCENARIO_MEMBER.member_insta_guide.options;
-            } else if (isAdminPath && (lowerText.includes('設定') || lowerText.includes('キャラクター') || lowerText.includes('口調'))) {
-                botResponse = SCENARIO_MEMBER.member_settings_guide.botMessage;
-                nextOptions = SCENARIO_MEMBER.member_settings_guide.options;
-            } else if (isAdminPath && (lowerText.includes('売上') || lowerText.includes('集客') || lowerText.includes('コツ') || lowerText.includes('テクニック'))) {
-                botResponse = SCENARIO_MEMBER.member_revenue_tips.botMessage;
-                nextOptions = SCENARIO_MEMBER.member_revenue_tips.options;
-            } else if (isAdminPath && (lowerText.includes('hp') || lowerText.includes('更新') || lowerText.includes('メニュー') || lowerText.includes('画像'))) {
-                botResponse = SCENARIO_MEMBER.member_hp_guide.botMessage;
-                nextOptions = SCENARIO_MEMBER.member_hp_guide.options;
             }
 
             const botMsg: Message = {

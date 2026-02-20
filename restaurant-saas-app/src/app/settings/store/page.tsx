@@ -18,6 +18,15 @@ import {
     MessageSquareShare,
     Lock,
     RefreshCcw,
+    Building2,
+    Clock,
+    Users,
+    Percent,
+    CalendarDays,
+    Camera,
+    Smartphone,
+    X,
+    CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +44,8 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useRef } from "react";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import type { ReplyConfig } from "@/lib/review-handler";
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -120,11 +131,26 @@ export default function StoreSettingsPage() {
 
 function StoreSettingsContent() {
     const [config, setConfig] = useState<ToneConfigData>(DEFAULT_CONFIG);
+    const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [isBusinessConfigSaving, setIsBusinessConfigSaving] = useState(false);
     const { user, getToken } = useAuth();
     const { hasFeature, loading: planLoading, refreshPlan } = usePlanGuard();
     const router = useRouter();
+
+    // --- Business Config States ---
+    const [businessConfig, setBusinessConfig] = useState({
+        is24h: false,
+        hasBreakTime: true,
+        lunchStart: '11:00',
+        lunchEnd: '15:00',
+        dinnerStart: '17:00',
+        dinnerEnd: '23:00',
+        regularHolidays: [] as number[],
+        seats: 30,
+        targetFoodCost: 35
+    });
 
     /** textareaの参照（タグ挿入用） */
     const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -145,6 +171,13 @@ function StoreSettingsContent() {
     const [instaPosting, setInstaPosting] = useState(false);
     const [instaPreviewUrl, setInstaPreviewUrl] = useState<string | null>(null);
 
+    // --- Camera States ---
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [cameraMode, setCameraMode] = useState<'portrait' | 'landscape' | 'insta-square' | 'insta-story'>('landscape');
+    const [activeTargetField, setActiveTargetField] = useState<string | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+
     // activeModelName related code removed
 
     // 設定を取得
@@ -153,14 +186,20 @@ function StoreSettingsContent() {
             const token = await getToken();
             if (!token) return; // Wait for token
 
-            const response = await fetch("/api/settings/get", {
-                cache: "no-store",
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-            if (!response.ok) throw new Error("設定の取得に失敗しました");
-            const data = await response.json();
+            const { getDashboardStats } = await import("@/app/actions/dashboard");
+            const [settingsRes, statsData] = await Promise.all([
+                fetch("/api/settings/get", {
+                    cache: "no-store",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    }
+                }),
+                getDashboardStats(token)
+            ]);
+
+            if (!settingsRes.ok) throw new Error("設定の取得に失敗しました");
+            const data = await settingsRes.json();
+            setStats(statsData);
 
             setConfig({
                 store_name: data.store_name || "",
@@ -172,16 +211,48 @@ function StoreSettingsContent() {
                 reply_config: data.reply_config ?? DEFAULT_CONFIG.reply_config,
                 reply_templates: data.reply_templates || DEFAULT_CONFIG.reply_templates,
             });
+
+            // 既存のビジネス設定があれば反映 (DBキー名の不一致に対応)
+            const bConfig = data.businessConfig || data.business_config;
+            if (bConfig) {
+                setBusinessConfig(prev => ({ ...prev, ...bConfig }));
+            }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "設定の取得に失敗しました");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [getToken]);
 
     useEffect(() => {
         fetchConfig();
     }, [fetchConfig]);
+
+    // 基本情報の保存 (Business Config)
+    const handleBusinessConfigSave = async () => {
+        try {
+            setIsBusinessConfigSaving(true);
+            const token = await getToken();
+            if (!token) throw new Error("認証が必要です");
+
+            const response = await fetch("/api/settings/save", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                // 他の設定と混ざらないよう、business_config キーでラップ
+                body: JSON.stringify({ business_config: businessConfig }),
+            });
+
+            if (!response.ok) throw new Error("基本情報の保存に失敗しました");
+            toast.success("基本情報を保存しました。AI分析の精度が向上します。");
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setIsBusinessConfigSaving(false);
+        }
+    };
 
     // 設定を保存
     const handleSave = async () => {
@@ -339,11 +410,24 @@ function StoreSettingsContent() {
             return;
         }
 
-        try {
-            setInstaPosting(true);
-            const token = await getToken();
-            if (!token) throw new Error("認証が必要です");
+        if (!instaFile) {
+            toast.warning("投稿する画像がありません");
+            return;
+        }
 
+        setInstaPosting(true);
+        try {
+            // 1. 画像を Firebase Storage にアップロード
+            const fileExt = instaFile.name.split('.').pop();
+            const fileName = `${user?.uid}_${Date.now()}.${fileExt}`;
+            const storageRef = ref(storage, `instagram_uploads/${user?.uid}/${fileName}`);
+
+            toast.info("画像をアップロード中...");
+            const uploadSnapshot = await uploadBytes(storageRef, instaFile);
+            const downloadUrl = await getDownloadURL(uploadSnapshot.ref);
+
+            // 2. Instagram API を呼び出し
+            const token = await getToken();
             const response = await fetch("/api/instagram/post", {
                 method: "POST",
                 headers: {
@@ -351,34 +435,93 @@ function StoreSettingsContent() {
                     "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    imageUrl: "https://images.unsplash.com/photo-1552566626-52f8b828add9", // 実機検証用の仮URL
-                    caption: instaCaption
+                    caption: instaCaption,
+                    imageUrl: downloadUrl,
                 }),
             });
 
             if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.error || "投稿に失敗しました");
+                const errorData = await response.json();
+                throw new Error(errorData.error || "投稿に失敗しました");
             }
 
             toast.success("Instagram に投稿しました！");
-            setInstaAnalysis(null);
-            setInstaCaption("");
+
+            // 投稿成功後のリセット
             setInstaFile(null);
             setInstaPreviewUrl(null);
-        } catch (error: any) {
-            toast.error(error.message);
+            setInstaAnalysis(null);
+            setInstaCaption("");
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || "Instagram 投稿エラー");
         } finally {
             setInstaPosting(false);
         }
     };
 
-    // handleInstagramPost removed as it was unused and caused lint errors
+    // --- Camera Functions ---
+    const startCamera = async (targetField: string, initialMode: 'portrait' | 'landscape' | 'insta-square' | 'insta-story') => {
+        setActiveTargetField(targetField);
+        setCameraMode(initialMode);
+        setIsCameraOpen(true);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
+            streamRef.current = stream;
+            setTimeout(() => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            }, 100);
+        } catch (err) {
+            toast.error("カメラの起動に失敗しました。設定を確認してください。");
+            setIsCameraOpen(false);
+        }
+    };
+
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+        }
+        setIsCameraOpen(false);
+        setActiveTargetField(null);
+    };
+
+    const capturePhoto = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(videoRef.current, 0, 0);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const file = new File([blob], "captured-photo.jpg", { type: "image/jpeg" });
+                        setInstaFile(file);
+                        setInstaPreviewUrl(URL.createObjectURL(blob));
+                        toast.success("写真をキャプチャしました！");
+                    }
+                }, 'image/jpeg');
+                stopCamera();
+            }
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []);
 
     return (
         <div className="min-h-screen bg-background text-foreground">
             <div className="flex h-screen max-h-screen">
-                <AppSidebar activePage="store" />
+                <AppSidebar activePage="store" stats={stats} user={user} />
 
                 <main className="flex-1 overflow-y-auto">
                     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8">
@@ -416,6 +559,13 @@ function StoreSettingsContent() {
                                         >
                                             <Instagram className="size-4 text-orange-500" />
                                             <span>Instagram</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="business"
+                                            className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
+                                        >
+                                            <Building2 className="size-4 text-emerald-500" />
+                                            <span>基本情報</span>
                                         </TabsTrigger>
                                         <TabsTrigger
                                             value="testing"
@@ -508,7 +658,7 @@ function StoreSettingsContent() {
 
                                     <TabsContent value="reviews">
                                         <div className="space-y-8">
-                                            <Card className="shadow-sm">
+                                            <Card className="shadow-sm border-blue-100 bg-blue-50/10">
                                                 <CardHeader className="flex flex-row items-center justify-between">
                                                     <div>
                                                         <CardTitle className="flex items-center gap-2">
@@ -521,6 +671,13 @@ function StoreSettingsContent() {
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent className="space-y-4">
+                                                    <div className="bg-white/50 border border-blue-200 rounded-lg p-3 mb-4 text-[11px] text-blue-800 leading-relaxed">
+                                                        <p className="font-bold flex items-center gap-1 mb-1">
+                                                            <Sparkles className="size-3" />
+                                                            Google 審査準拠のセーフティガード
+                                                        </p>
+                                                        AIによる自動返信は、お客様とのトラブルを避けるため、高評価（星3以上）に限定することを推奨しています。星2以下の低評価については、店主様による内容の最終確認を推奨するため、デフォルトでは「手動」に設定されています。
+                                                    </div>
                                                     <div className="divide-y">
                                                         {(["5", "4", "3", "2", "1"] as const).map((star) => (
                                                             <div key={star} className="flex items-center justify-between py-4">
@@ -664,7 +821,7 @@ function StoreSettingsContent() {
                                                                                 ...prev,
                                                                                 reply_templates: {
                                                                                     ...prev.reply_templates,
-                                                                                    [star]: { ...prev.reply_templates[star], body: e.target.value }
+                                                                                    [star]: { ...prev.reply_templates[star], body: nextBody }
                                                                                 }
                                                                             }))}
                                                                             rows={6}
@@ -718,9 +875,9 @@ function StoreSettingsContent() {
                                                             <div className="p-3 bg-muted rounded-full mb-4">
                                                                 <Lock className="size-6 text-muted-foreground" />
                                                             </div>
-                                                            <h3 className="text-lg font-bold mb-2">Standardプラン以上で利用可能</h3>
+                                                            <h3 className="text-lg font-bold mb-2">Proプラン以上で利用可能</h3>
                                                             <p className="text-sm text-muted-foreground mb-6 max-w-[300px]">
-                                                                Instagram連携機能を使用するには、プランのアップグレードが必要です。
+                                                                Instagram連携・素材収集機能を使用するには、プランのアップグレードが必要です。
                                                             </p>
                                                             <div className="flex flex-col sm:flex-row gap-3">
                                                                 <Button
@@ -744,6 +901,25 @@ function StoreSettingsContent() {
 
                                                     <CardContent className="space-y-6 pt-4">
                                                         <div className="space-y-4">
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    className="h-16 flex flex-col items-center gap-1 border-pink-200 text-pink-600 hover:bg-pink-50 hover:border-pink-300 transition-all rounded-xl"
+                                                                    onClick={() => startCamera('insta_feed', 'insta-square')}
+                                                                >
+                                                                    <Camera className="size-5" />
+                                                                    <span className="text-[10px] font-bold">フィード用ガイド</span>
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    className="h-16 flex flex-col items-center gap-1 border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300 transition-all rounded-xl"
+                                                                    onClick={() => startCamera('insta_story', 'insta-story')}
+                                                                >
+                                                                    <Smartphone className="size-5" />
+                                                                    <span className="text-[10px] font-bold">ストーリー用ガイド</span>
+                                                                </Button>
+                                                            </div>
+
                                                             <div className="group flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-2xl p-8 hover:bg-muted/30 transition-all cursor-pointer relative overflow-hidden"
                                                                 onClick={() => document.getElementById('insta-upload')?.click()}
                                                             >
@@ -759,7 +935,7 @@ function StoreSettingsContent() {
                                                                         <div className="p-4 bg-muted rounded-full mb-2 group-hover:bg-primary/10 transition-colors">
                                                                             <Instagram className="size-10 group-hover:text-primary transition-colors" />
                                                                         </div>
-                                                                        <p className="text-sm font-bold">クリックして画像を選択</p>
+                                                                        <p className="text-sm font-bold">または画像を選択</p>
                                                                         <p className="text-[10px] opacity-70">JPG, PNG (最大5MB)</p>
                                                                     </div>
                                                                 )}
@@ -813,6 +989,213 @@ function StoreSettingsContent() {
                                                         </div>
                                                     </CardContent>
                                                 </div>
+                                            </Card>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="business">
+                                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <Card className="shadow-md border-emerald-100 bg-emerald-50/5 overflow-hidden">
+                                                <CardHeader className="bg-emerald-50/30 border-b border-emerald-100/50">
+                                                    <CardTitle className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2 text-emerald-700">
+                                                            <Building2 className="size-5" />
+                                                            店舗の基本スペック設定
+                                                        </div>
+                                                        <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm transition-all hover:bg-emerald-100">
+                                                            <Label htmlFor="24h-mode" className="text-[11px] font-bold text-emerald-700 cursor-pointer whitespace-nowrap">24時間営業</Label>
+                                                            <Switch
+                                                                id="24h-mode"
+                                                                checked={businessConfig.is24h}
+                                                                onCheckedChange={(c) => setBusinessConfig({ ...businessConfig, is24h: c, hasBreakTime: !c })}
+                                                            />
+                                                        </div>
+                                                    </CardTitle>
+                                                    <div className="text-sm text-emerald-600/80 mt-1">
+                                                        AIがお店の経営状態を正確に分析するために必要な情報です。
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="pt-8 space-y-10">
+                                                    {/* 営業時間セクション */}
+                                                    <div className="grid gap-6">
+                                                        <div className="flex items-center gap-2 border-b pb-2">
+                                                            <Clock className="size-4 text-emerald-500" />
+                                                            <h3 className="font-bold text-gray-700">標準的な営業時間</h3>
+                                                        </div>
+
+                                                        {!businessConfig.is24h ? (
+                                                            <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <div className="flex items-center justify-between bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                                                                    <div className="space-y-0.5">
+                                                                        <Label className="text-sm font-bold text-gray-700">中休み（アイドルタイム）あり</Label>
+                                                                        <p className="text-[10px] text-gray-400">ランチとディナーで営業を分ける場合にONにします。</p>
+                                                                    </div>
+                                                                    <Switch
+                                                                        checked={businessConfig.hasBreakTime}
+                                                                        onCheckedChange={(c) => setBusinessConfig({ ...businessConfig, hasBreakTime: c })}
+                                                                    />
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-2">
+                                                                    <div className="space-y-3 p-4 bg-orange-50/20 rounded-xl border border-orange-100/50">
+                                                                        <Label className="text-xs font-bold text-orange-600 uppercase tracking-wider flex items-center gap-1">
+                                                                            <Sparkles className="size-3" /> {businessConfig.hasBreakTime ? 'ランチ営業' : '開店時間'}
+                                                                        </Label>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <Input
+                                                                                type="time"
+                                                                                value={businessConfig.lunchStart}
+                                                                                onChange={(e) => setBusinessConfig({ ...businessConfig, lunchStart: e.target.value })}
+                                                                                className="h-12 text-lg font-medium bg-white"
+                                                                            />
+                                                                            <span className="text-gray-400">〜</span>
+                                                                            <Input
+                                                                                type="time"
+                                                                                value={businessConfig.lunchEnd}
+                                                                                onChange={(e) => setBusinessConfig({ ...businessConfig, lunchEnd: e.target.value })}
+                                                                                className="h-12 text-lg font-medium bg-white"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {businessConfig.hasBreakTime && (
+                                                                        <div className="space-y-3 p-4 bg-indigo-50/20 rounded-xl border border-indigo-100/50 animate-in zoom-in-95 duration-200">
+                                                                            <Label className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                                                                                <Sparkles className="size-3" /> ディナー営業
+                                                                            </Label>
+                                                                            <div className="flex items-center gap-3">
+                                                                                <Input
+                                                                                    type="time"
+                                                                                    value={businessConfig.dinnerStart}
+                                                                                    onChange={(e) => setBusinessConfig({ ...businessConfig, dinnerStart: e.target.value })}
+                                                                                    className="h-12 text-lg font-medium bg-white"
+                                                                                />
+                                                                                <span className="text-gray-400">〜</span>
+                                                                                <Input
+                                                                                    type="time"
+                                                                                    value={businessConfig.dinnerEnd}
+                                                                                    onChange={(e) => setBusinessConfig({ ...businessConfig, dinnerEnd: e.target.value })}
+                                                                                    className="h-12 text-lg font-medium bg-white"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-2xl p-10 text-center animate-in zoom-in-95 duration-300">
+                                                                <Sparkles className="size-10 text-emerald-400 mx-auto mb-3" />
+                                                                <p className="text-emerald-700 text-lg font-bold">24時間営業モード</p>
+                                                                <p className="text-sm text-emerald-600/70 mt-1">AIは全時間帯をピークとして、切れ目なくデータを集計・分析します。</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* 定休日セクション */}
+                                                    <div className="grid gap-4">
+                                                        <div className="flex items-center gap-2 border-b pb-2">
+                                                            <CalendarDays className="size-4 text-emerald-500" />
+                                                            <h3 className="font-bold text-gray-700">定休日（AI分析除外日）</h3>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 pl-2">
+                                                            {[
+                                                                { label: '日', value: 0 },
+                                                                { label: '月', value: 1 },
+                                                                { label: '火', value: 2 },
+                                                                { label: '水', value: 3 },
+                                                                { label: '木', value: 4 },
+                                                                { label: '金', value: 5 },
+                                                                { label: '土', value: 6 },
+                                                            ].map((day) => (
+                                                                <button
+                                                                    key={day.value}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const holidays = businessConfig.regularHolidays.includes(day.value)
+                                                                            ? businessConfig.regularHolidays.filter(d => d !== day.value)
+                                                                            : [...businessConfig.regularHolidays, day.value];
+                                                                        setBusinessConfig({ ...businessConfig, regularHolidays: holidays });
+                                                                    }}
+                                                                    className={`w-12 h-12 rounded-xl text-sm font-bold transition-all border-2 ${businessConfig.regularHolidays.includes(day.value)
+                                                                        ? 'bg-red-500 text-white border-red-500 shadow-md transform scale-105'
+                                                                        : 'bg-white text-gray-400 border-gray-100 hover:border-emerald-200'
+                                                                        }`}
+                                                                >
+                                                                    {day.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-400 pl-2">※定休日に売上があった場合、AIが「イレギュラー営業」として特別分析を行います。</p>
+                                                    </div>
+
+                                                    {/* キャパシティ・目標セクション */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-center gap-2 border-b pb-2">
+                                                                <Users className="size-4 text-emerald-500" />
+                                                                <h3 className="font-bold text-gray-700">客席数（キャパシティ）</h3>
+                                                            </div>
+                                                            <div className="pl-2 space-y-2">
+                                                                <div className="flex items-end gap-2">
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={businessConfig.seats}
+                                                                        onChange={(e) => setBusinessConfig({ ...businessConfig, seats: Number(e.target.value) })}
+                                                                        placeholder="30"
+                                                                        className="h-12 text-2xl font-bold w-32"
+                                                                    />
+                                                                    <span className="text-gray-500 font-medium pb-2">席</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-gray-400">※満席時や回転率の計算に使用します。</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-center gap-2 border-b pb-2">
+                                                                <Percent className="size-4 text-emerald-500" />
+                                                                <h3 className="font-bold text-gray-700">目標原価率 (Food Cost)</h3>
+                                                            </div>
+                                                            <div className="pl-2 space-y-2">
+                                                                <div className="flex items-end gap-2">
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={businessConfig.targetFoodCost}
+                                                                        onChange={(e) => setBusinessConfig({ ...businessConfig, targetFoodCost: Number(e.target.value) })}
+                                                                        placeholder="35"
+                                                                        className="h-12 text-2xl font-bold w-32"
+                                                                    />
+                                                                    <span className="text-gray-500 font-medium pb-2">%</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-gray-400">※AIが仕入れ金額の異常を検知する基準になります。</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 flex gap-4">
+                                                        <div className="bg-white p-3 rounded-full shadow-sm self-start">
+                                                            <Sparkles className="size-5 text-blue-500" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <h4 className="text-sm font-bold text-blue-900">AIからのアドバイス準備</h4>
+                                                            <p className="text-xs text-blue-800/70 leading-relaxed">
+                                                                これらの基本情報を入力することで、AIはあなたの店舗を「一人の経営パートナー」として深く理解します。
+                                                                売上目標の達成状況や、原価の無駄を自動で見つけ出し、チャットで報告できるようになります。
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex justify-center pt-4">
+                                                        <Button
+                                                            size="lg"
+                                                            className="w-full max-w-xs bg-emerald-600 hover:bg-emerald-700 font-bold gap-2"
+                                                            onClick={handleBusinessConfigSave}
+                                                            disabled={isBusinessConfigSaving}
+                                                        >
+                                                            {isBusinessConfigSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                                                            店舗情報を確定する
+                                                        </Button>
+                                                    </div>
+                                                </CardContent>
                                             </Card>
                                         </div>
                                     </TabsContent>
@@ -904,6 +1287,74 @@ function StoreSettingsContent() {
                     </div>
                 </main>
             </div>
+
+            {/* Camera Overlay Modal */}
+            {isCameraOpen && (
+                <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
+                    <div className="absolute top-4 left-0 right-0 px-6 flex justify-between items-center z-[110]">
+                        <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                            <span className="text-white text-[10px] font-black uppercase tracking-widest leading-none">
+                                Guide: {cameraMode === 'insta-square' ? 'Square' : 'Stories'}
+                            </span>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-white hover:bg-white/20 rounded-full"
+                            onClick={stopCamera}
+                        >
+                            <X className="size-8" />
+                        </Button>
+                    </div>
+
+                    <div className="relative w-full h-full max-w-lg flex items-center justify-center bg-gray-950">
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 pointer-events-none">
+                            {/* Grid Lines */}
+                            <div className="w-full h-full grid grid-cols-3 grid-rows-3 opacity-20">
+                                <div className="border-r border-b border-white/50"></div>
+                                <div className="border-r border-b border-white/50"></div>
+                                <div className="border-b border-white/50"></div>
+                                <div className="border-r border-b border-white/50"></div>
+                                <div className="border-r border-b border-white/50"></div>
+                                <div className="border-b border-white/50"></div>
+                                <div className="border-r border-white/50"></div>
+                                <div className="border-r border-white/50"></div>
+                                <div></div>
+                            </div>
+
+                            {/* Main Guide Frame */}
+                            <div className="absolute inset-0 flex items-center justify-center p-8">
+                                <div className={`border-2 border-primary shadow-[0_0_30px_rgba(var(--primary-rgb),0.3)] transition-all duration-300 w-full ${cameraMode === 'insta-square' ? 'aspect-square' :
+                                    cameraMode === 'insta-story' ? 'aspect-[9/16]' :
+                                        'aspect-[3/4]'
+                                    }`}>
+                                    <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-white"></div>
+                                    <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-white"></div>
+                                    <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-white"></div>
+                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-white"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="absolute bottom-12 left-0 right-0 flex justify-center items-center z-[110]">
+                        <Button
+                            size="icon"
+                            className="size-20 rounded-full bg-white hover:bg-gray-100 shadow-2xl border-4 border-gray-200 active:scale-90 transition-all p-0"
+                            onClick={capturePhoto}
+                        >
+                            <div className="size-16 rounded-full border-2 border-gray-300"></div>
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

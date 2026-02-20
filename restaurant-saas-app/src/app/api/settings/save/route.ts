@@ -1,6 +1,5 @@
-
 import { NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { adminDb, getDbForUser } from "@/lib/firebase-admin";
 import { verifyAuth } from "@/lib/auth-utils";
 import { isValidEmail, isValidPhone } from "@/lib/notification-handler";
 import { FieldValue } from "firebase-admin/firestore";
@@ -23,7 +22,7 @@ export async function POST(request: Request) {
             sms_limit_override
         } = body;
 
-        // 1. Validation (Simplified for migration safety)
+        // 1. Validation
         if (notification_config) {
             if (notification_config.email_enabled && notification_config.email_address && !isValidEmail(notification_config.email_address)) {
                 return NextResponse.json({ error: "メールアドレスの形式が正しくありません" }, { status: 400 });
@@ -40,8 +39,15 @@ export async function POST(request: Request) {
         }
         const uid = user.uid;
 
-        // 3. Prepare Update Data for Firestore
-        // Mapped to camelCase for Firestore
+        // 【デモユーザーガード】
+        if (uid === "demo-user-id") {
+            return NextResponse.json({ success: true, message: "設定を一時的に反映しました（デモモード）" });
+        }
+
+        // 3. 適切な DB インスタンスを取得
+        const db = await getDbForUser(uid);
+
+        // 4. Prepare Update Data
         const updateData: any = {
             updatedAt: FieldValue.serverTimestamp(),
             ownerUid: uid
@@ -58,14 +64,14 @@ export async function POST(request: Request) {
         if (notification_config !== undefined) updateData.notificationConfig = notification_config;
         if (sms_limit_override !== undefined) updateData.smsLimitOverride = sms_limit_override;
 
-        // Handle other legacy fields if needed (omitted for speed/safety as they weren't in my basic schema, 
-        // but can be added to the 'websiteMaterials' or root if important).
-        // Since the user said "storeId = uid", we write to stores/{uid}.
+        // 新機能: ビジネス設定（営業時間、席数、原価率）の保存
+        if (body.business_config !== undefined) {
+            updateData.businessConfig = body.business_config;
+        }
 
-        await adminDb.collection("stores").doc(uid).set(updateData, { merge: true });
+        await db.collection("stores").doc(uid).set(updateData, { merge: true });
 
-        // 4. Return Success
-        return NextResponse.json({ success: true, data: updateData });
+        return NextResponse.json({ success: true });
 
     } catch (error: any) {
         console.error("Settings POST error:", error);

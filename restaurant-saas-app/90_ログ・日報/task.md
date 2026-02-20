@@ -54,3 +54,17 @@
 - [x] オーナー指定予算（600円〜3500円）に基づくAI利用上限の再設計
 - [x] AIモデル運用ルール（3 Pro メイン採用）の仕様書への反映
 - [x] 各プランのAIテキスト/画像生成上限の更新
+- [x] **AIモデル運用規則の徹底と503エラー対策**
+  - [x] 実装計画書の作成とユーザー承認 [implementation_plan.md](file:///C:/Users/SATO/.gemini/antigravity/brain/d7c92b52-69e0-47f4-b9db-2b450eb2ef09/implementation_plan.md)
+  - [x] `src/lib/vertex-ai.ts` の修正（Flashモデル優先への基盤変更）
+  - [x] `src/app/api/generate-reply/route.ts` の修正（フォールバック強化）
+  - [x] `src/app/api/instagram/analyze/route.ts` の修正（モデル統一）
+  - [x] `src/lib/ai-quota.ts` の修正（コスト計算の適正化）
+  - [x] 全ドキュメントの同期（Task_Tracker, Dashboard, 日報）
+- [x] **Firebase設定不備（5 NOT_FOUND）の解消とマルチプロジェクト対応**
+  - [x] 実装計画書（V2）の作成と承認 [implementation_plan_v2.md](file:///C:/Users/SATO/.gemini/antigravity/brain/d7c92b52-69e0-47f4-b9db-2b450eb2ef09/implementation_plan_v2.md)
+  - [x] 多重Firebaseプロジェクト構成の実装（Primary/Secondary両対応）
+  - [x] `auth-utils.ts` の二段階認証実装（両方のプロジェクトでログイン可能）
+  - [x] `getDbForUser` ユーティリティによる動的DB選択の実装
+  - [x] 各API（sync, settings, dashboard）の接続エラー保護
+  - [x] 全ドキュメントの同期（Task_Tracker, Dashboard, 日報）

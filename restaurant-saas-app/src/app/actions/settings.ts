@@ -9,51 +9,37 @@ import { StoreData, UserProfile } from "@/types/firestore";
  */
 export async function getUserProfile(idToken: string) {
     try {
-        let uid: string;
+        const { verifyAuth } = await import("@/lib/auth-utils");
+        const user = await verifyAuth(idToken);
+        if (!user) {
+            return { success: false, error: "Unauthorized" };
+        }
+        const uid = user.uid;
 
-        // 開発環境用のデモトークン対応
-        if (process.env.NODE_ENV === "development" && idToken === "demo-token") {
-            uid = "demo-user-id";
+        // デモユーザー対応
+        if (uid === "demo-user-id") {
             return {
                 success: true,
-                user: {
-                    uid: "demo-user-id",
-                    email: "demo@example.com",
-                    displayName: "デモユーザー",
-                    plan: "Standard",
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                },
-                store: {
-                    storeName: "デモ店舗 (Demo Store)",
-                    ownerUid: "demo-user-id",
-                    aiTone: "polite",
-                    replySignature: "店主より",
-                    websiteMaterials: {
-                        catchCopy: "こだわりの自家製麺と、秘伝のスープをお楽しみください。",
-                        images: {}
-                    },
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                } as StoreData
+                user: { uid, email: "demo@example.com", displayName: "デモユーザー", plan: "Standard", createdAt: new Date() },
+                store: { storeName: "デモ店舗", ownerUid: uid, aiTone: "polite" }
             };
-        } else {
-            const decodedToken = await adminAuth.verifyIdToken(idToken);
-            uid = decodedToken.uid;
         }
 
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
+
         const [userDoc, storeDoc] = await Promise.all([
-            adminDb.collection("users").doc(uid).get(),
-            adminDb.collection("stores").doc(uid).get()
+            db.collection("users").doc(uid).get(),
+            db.collection("stores").doc(uid).get()
         ]);
 
-        const user = userDoc.exists ? (userDoc.data() as UserProfile) : null;
+        const userProfile = userDoc.exists ? (userDoc.data() as UserProfile) : null;
         const store = storeDoc.exists ? (storeDoc.data() as StoreData) : null;
 
-        return { success: true, user, store };
+        return { success: true, user: userProfile, store };
     } catch (error) {
         console.error("Error fetching user profile:", error);
-        return { success: false, error: "Failed to fetch profile (Firestore offline or invalid auth)" };
+        return { success: false, error: "Failed to fetch profile" };
     }
 }
 
@@ -62,12 +48,18 @@ export async function getUserProfile(idToken: string) {
  */
 export async function saveUserProfile(idToken: string, data: Partial<UserProfile>) {
     try {
-        const decodedToken = await adminAuth.verifyIdToken(idToken);
-        const uid = decodedToken.uid;
+        const { verifyAuth } = await import("@/lib/auth-utils");
+        const user = await verifyAuth(idToken);
+        if (!user) return { success: false, error: "Unauthorized" };
+        const uid = user.uid;
+        if (uid === "demo-user-id") return { success: true };
 
-        await adminDb.collection("users").doc(uid).set({
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
+
+        await db.collection("users").doc(uid).set({
             ...data,
-            updatedAt: FieldValue.serverTimestamp() // Fix: Use serverTimestamp instead of null
+            updatedAt: FieldValue.serverTimestamp()
         }, { merge: true });
 
         return { success: true };
@@ -82,21 +74,22 @@ export async function saveUserProfile(idToken: string, data: Partial<UserProfile
  */
 export async function saveStoreSettings(idToken: string, data: Partial<StoreData>) {
     try {
-        const decodedToken = await adminAuth.verifyIdToken(idToken);
-        const uid = decodedToken.uid;
+        const { verifyAuth } = await import("@/lib/auth-utils");
+        const user = await verifyAuth(idToken);
+        if (!user) return { success: false, error: "Unauthorized" };
+        const uid = user.uid;
+        if (uid === "demo-user-id") return { success: true };
 
-        // タイムスタンプの更新（型エラー回避のため、FieldValueを使用するか、Date型を使う場合は注意）
-        // StoreData型定義では `Timestamp | Date` となっているが、set時のFieldValueは互換性がある。
-        // ただしTypeScriptの厳密なチェックではエラーになることがあるため、as anyで回避するか、
-        // 単に spread する。
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
 
         const updateData = {
             ...data,
-            ownerUid: uid, // Ensure ownerUid is set
+            ownerUid: uid,
             updatedAt: FieldValue.serverTimestamp()
         };
 
-        await adminDb.collection("stores").doc(uid).set(updateData, { merge: true });
+        await db.collection("stores").doc(uid).set(updateData, { merge: true });
 
         return { success: true };
     } catch (error) {

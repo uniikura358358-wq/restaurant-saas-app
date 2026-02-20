@@ -21,6 +21,7 @@ export default function MaterialsPage() {
     const { user, getToken, loading: authLoading } = useAuth();
     const router = useRouter();
     const { hasFeature, loading: planLoading, refreshPlan } = usePlanGuard();
+    const [stats, setStats] = useState<any>(null);
     const [useGoogleData, setUseGoogleData] = useState(true);
     const [catchCopy, setCatchCopy] = useState("こだわりの自家製麺と、秘伝のスープをお楽しみください。");
     const [isAdjusting, setIsAdjusting] = useState(false);
@@ -74,9 +75,16 @@ export default function MaterialsPage() {
                 const token = await getToken();
                 if (!token) return;
 
-                const { success, store, error } = await getUserProfile(token);
-                if (success && store) {
-                    // StoreDataから状態を復元
+                const { getDashboardStats } = await import("@/app/actions/dashboard");
+                const [statsData, profileRes] = await Promise.all([
+                    getDashboardStats(token),
+                    getUserProfile(token)
+                ]);
+
+                if (statsData) setStats(statsData);
+
+                if (profileRes.success && profileRes.store) {
+                    const store = profileRes.store;
                     if (store.storeName) setBasicInfo(prev => ({ ...prev, storeName: store.storeName }));
                     if (store.websiteMaterials) {
                         const wm = store.websiteMaterials;
@@ -264,7 +272,7 @@ export default function MaterialsPage() {
 
     return (
         <div className="flex min-h-screen bg-background text-foreground overflow-hidden">
-            <AppSidebar activePage="hp" user={user} />
+            <AppSidebar activePage="hp" user={user} stats={stats} />
             <main className="flex-1 overflow-y-auto">
                 <div className="container mx-auto py-10 px-4 max-w-4xl">
                     <h1 className="text-3xl font-bold mb-2">HP制作・素材管理</h1>

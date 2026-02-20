@@ -87,7 +87,9 @@ export async function POST(request: Request) {
         }
 
         // 3. Idempotency Check (冪等性)
-        const requestRef = adminDb.collection("requests").doc(requestId);
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(user.uid);
+        const requestRef = db.collection("requests").doc(requestId);
         const requestDoc = await requestRef.get();
 
         if (requestDoc.exists) {
@@ -109,9 +111,9 @@ export async function POST(request: Request) {
         let resultData: any;
 
         try {
-            await adminDb.runTransaction(async (t) => {
+            await db.runTransaction(async (t) => {
                 // Read operations must come first
-                const reviewRef = adminDb.collection("reviews").doc(reviewId);
+                const reviewRef = db.collection("reviews").doc(reviewId);
                 const reviewDoc = await t.get(reviewRef);
 
                 if (!reviewDoc.exists) {
@@ -127,7 +129,7 @@ export async function POST(request: Request) {
                     throw new Error("既に返信済みです");
                 }
 
-                const statsRef = adminDb.collection("users").doc(user.uid).collection("stats").doc("current");
+                const statsRef = db.collection("users").doc(user.uid).collection("stats").doc("current");
                 const statsDoc = await t.get(statsRef);
 
                 // Write operations
@@ -143,7 +145,7 @@ export async function POST(request: Request) {
                 });
 
                 // C. Create Reply
-                const replyRef = adminDb.collection("replies").doc(reviewId);
+                const replyRef = db.collection("replies").doc(reviewId);
                 t.set(replyRef, {
                     id: reviewId,
                     userId: user.uid,
@@ -199,7 +201,7 @@ export async function POST(request: Request) {
         // トランザクション成功後に実行。失敗してもDBはロールバックしない（整合性優先）
         // ※ 本来は Cloud Functions トリガーで非同期に行うのがベストだが、Phase 3 では同期的実行を維持
         // 必要であれば google_review_id を取得しておく必要がある
-        const reviewDocAfter = await adminDb.collection("reviews").doc(reviewId).get();
+        const reviewDocAfter = await db.collection("reviews").doc(reviewId).get();
         const googleReviewId = reviewDocAfter.data()?.id; // Assuming id IS google_review_id or stored elsewhere
 
         // 注: FirestoreReview schema では id が Google Review ID かどうか明記されていないが、

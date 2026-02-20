@@ -29,13 +29,27 @@ export async function GET(request: Request) {
             );
         }
 
-        // トークン検索
-        const snapshot = await adminDb.collection("verificationCodes")
+        // 1. トークン検索（プロジェクトを跨いで検索）
+        const { adminDbSecondary, getDbForUser } = await import("@/lib/firebase-admin");
+
+        let snapshot = await adminDb.collection("verificationCodes")
             .where("token", "==", token)
             .where("channel", "==", "email")
             .where("verified", "==", false)
             .limit(1)
             .get();
+
+        let db = adminDb;
+
+        if (snapshot.empty) {
+            snapshot = await adminDbSecondary.collection("verificationCodes")
+                .where("token", "==", token)
+                .where("channel", "==", "email")
+                .where("verified", "==", false)
+                .limit(1)
+                .get();
+            db = adminDbSecondary;
+        }
 
         if (snapshot.empty) {
             return NextResponse.redirect(
@@ -58,7 +72,8 @@ export async function GET(request: Request) {
         await verificationDoc.ref.update({ verified: true });
 
         // users/{userId} の notificationConfig を更新
-        const userRef = adminDb.collection("users").doc(userId);
+        // db は上で特定されたものを使用
+        const userRef = db.collection("users").doc(userId);
         const userDoc = await userRef.get();
 
         if (userDoc.exists) {
@@ -106,21 +121,18 @@ export async function POST(request: Request) {
         }
 
         // ユーザー認証チェック
-        const authHeader = request.headers.get("Authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const { verifyAuth } = await import("@/lib/auth-utils");
+        const user = await verifyAuth(request);
+        if (!user) {
             return NextResponse.json({ error: "認証されていません" }, { status: 401 });
         }
-        const idToken = authHeader.split("Bearer ")[1];
-        let decodedToken;
-        try {
-            decodedToken = await adminAuth.verifyIdToken(idToken);
-        } catch (e) {
-            return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-        }
-        const uid = decodedToken.uid;
+        const uid = user.uid;
+
+        const { getDbForUser } = await import("@/lib/firebase-admin");
+        const db = await getDbForUser(uid);
 
         // OTPコード検索
-        const snapshot = await adminDb.collection("verificationCodes")
+        const snapshot = await db.collection("verificationCodes")
             .where("token", "==", otp)
             .where("userId", "==", uid)
             .where("channel", "==", "sms")
@@ -151,7 +163,7 @@ export async function POST(request: Request) {
         await verificationDoc.ref.update({ verified: true });
 
         // users/{userId} の notificationConfig を更新
-        const userRef = adminDb.collection("users").doc(uid);
+        const userRef = db.collection("users").doc(uid);
         const userDoc = await userRef.get();
 
         if (userDoc.exists) {

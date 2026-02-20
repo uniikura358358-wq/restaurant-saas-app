@@ -7,6 +7,7 @@ import {
     disableNetwork
 } from "firebase/firestore";
 import { getAuth, Auth } from "firebase/auth";
+import { getStorage, FirebaseStorage } from "firebase/storage";
 
 // 環境変数の取得
 const firebaseConfig = {
@@ -22,6 +23,7 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let db: Firestore;
 let auth: Auth;
+let storage: FirebaseStorage;
 
 // Demoモード判定
 const isDemoMode =
@@ -54,8 +56,9 @@ try {
         }
     }
     auth = getAuth(app);
+    storage = getStorage(app);
 } catch (error) {
     console.error("Firebase initialization failed:", error);
 }
 
-export { auth, db };
+export { auth, db, storage };

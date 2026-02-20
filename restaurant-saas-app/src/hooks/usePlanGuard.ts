@@ -99,8 +99,8 @@ export function usePlanGuard() {
                 // Pro以上で許可（webの有無を問わない）
                 return isPro || isPremium;
             case 'ai_pop':
-                // Premiumのみ
-                return isPremium;
+                // Pro以上で許可
+                return isPro || isPremium;
             case 'priority_support':
                 // Premiumのみ
                 return isPremium;
