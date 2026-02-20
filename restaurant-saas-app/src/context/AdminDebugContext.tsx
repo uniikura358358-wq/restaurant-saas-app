@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type SimulatedPlan = 'web Light' | 'web Standard' | 'web Pro' | 'web Pro Premium' | null;
+type SimulatedPlan = 'web Light' | 'web Standard' | 'web Pro' | 'web Pro Premium' | 'Standard' | 'Pro' | 'Pro Premium' | null;
 
 interface AdminDebugContextType {
     simulatedPlan: SimulatedPlan;

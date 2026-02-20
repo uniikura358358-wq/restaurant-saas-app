@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -26,7 +27,9 @@ export function AdminToolbar() {
 
     const planOptions = [
         { label: 'Real', value: null },
-        { label: 'web Light', value: 'web Light' },
+        { label: 'Standard', value: 'Standard' },
+        { label: 'Pro', value: 'Pro' },
+        { label: 'Pro Premium', value: 'Pro Premium' },
         { label: 'web Standard', value: 'web Standard' },
         { label: 'web Pro', value: 'web Pro' },
         { label: 'web Pro Premium', value: 'web Pro Premium' },
@@ -73,9 +76,16 @@ export function AdminToolbar() {
                                         className={`text-[10px] px-2 py-1.5 rounded-lg border transition-all flex items-center justify-between ${simulatedPlan === opt.value
                                             ? 'bg-green-500 text-black border-transparent font-bold'
                                             : 'bg-green-500/5 border-green-500/20 hover:bg-green-500/20'
-                                            }`}
+                                            } ${realPlanName === opt.value ? 'ring-1 ring-green-500 ring-offset-1 ring-offset-black' : ''}`}
                                     >
-                                        {opt.label}
+                                        <span className="flex items-center gap-1">
+                                            {opt.label}
+                                            {realPlanName === opt.value && (
+                                                <span className={`text-[7px] px-1 py-0.5 rounded ${simulatedPlan === opt.value ? 'bg-black/20' : 'bg-green-500/20'}`}>
+                                                    REAL
+                                                </span>
+                                            )}
+                                        </span>
                                         {simulatedPlan === opt.value && <Check className="w-2.5 h-2.5" />}
                                     </button>
                                 ))}

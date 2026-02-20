@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AppSidebar } from "@/components/app-sidebar";
+import { usePlanGuard } from "@/hooks/usePlanGuard";
 import ReviewReplyButton from "@/components/review-reply-button";
 import { getDashboardStats, getReviews, submitReply } from "@/app/actions/dashboard";
 import { DashboardStats, FirestoreReview, Announcement } from "@/types/firestore";
@@ -53,6 +54,7 @@ export default function DashboardPage() {
 
 
   const { simulatedPlan } = useAdminDebug();
+  const { planName: guardPlanName } = usePlanGuard();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -74,7 +76,7 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
 
-      const token = await getToken().catch(() => "demo-token"); // 認証失敗時もデモトークンで試行
+      const token = await getToken().catch(() => "demo-token") || "demo-token"; // 認証失敗時もデモトークンで試行
 
       // 並行取得: Stats + Reviews
       try {
@@ -252,7 +254,7 @@ export default function DashboardPage() {
                   </p>
                   {stats?.planName && (
                     <Badge variant="secondary" className="text-[10px] font-bold bg-primary/10 text-primary border-none">
-                      {stats.planName}
+                      {guardPlanName || stats.planName}
                     </Badge>
                   )}
                 </div>

@@ -104,8 +104,8 @@
   - [x] 会計ダッシュボード：Airレジ/Square連携セクションの新設（マネタイズ導線の実装）
   - [x] 会計ダッシュボード：売上入力エリアのUI重要度向上（文字サイズ3倍、アイコン拡大）
   - [x] 会計ダッシュボード：同期実行ボタンの機能実装（擬似同期ロジックとトースト通知）
-  - [ ] プレミアム機能：AIによるリピーター離脱予測エンジンのプロトタイプ作成
-  - [ ] 設定画面：各POSレジAPI連携の認証フロー実装
+- [x] プレミアム機能：AIによるリピーター離脱予測エンジンのプロトタイプ作成
+- [x] 設定画面：各POSレジAPI連携の認証フロー実装 (UI基盤)
 - [x] **Troubleshooting**: メモリ異常消費プロセスの特定と強制終了 (検証スクリプトのハングアップ解消)
 - [x] **Phase 20: Project Cleanup** `[x]`
   - [x] 不要な検証用スクリプト（scripts/）13ファイルの削除
@@ -155,20 +155,39 @@
   - [x] **Step 3: Gemini による OCR 解析ロジック**
     - [x] 写真から店名・金額・日付・インボイス番号を自動抽出する API の実装。
     - [x] 解析結果のプレビューおよび仕訳登録完了までのシームレスなUI統合。
+- [x] **Phase 4: Production Polish & Scalability (2026-02-18 ~ 2026-02-21)**
+  - [x] **Firebase Storage 移行 (Completed)**:
+    - クレジット残高のある `restaurant-saas-2026` プロジェクトへ画像を全件移行。
+    - フロントエンドの配信URLを新プロジェクトへ自動切り替え。
+    - ローカルの `public/images/templates` を削除し、プロジェクトを軽量化。
+  - [x] **Google Review Reply AI 再調整**:
+    - `gemini-3-flash-preview` をデフォルトに設定。
+  - [x] **POS Register API Auth Flow**:
+    - 設定画面の実装。
+  - [ ] **AI Churn Prediction Prototype**:
+    - プレミアム機能のモックアップ作成。
 - [x] **Phase 19: AI POP Maker Enhancement (Canva Integration) & Cloud Migration** `[x]`
   - [x] **Templates Directory**: Created `public/images/templates/pop/` for high-quality Canva assets.
   - [x] **Template Sorting**: 40枚以上の混在テンプレートをアスペクト比に基づき自動仕分け。
   - [x] **Pro Category**: Added "Pro-only" style category to UI.
   - [x] **Layout Engine**: Implemented `PRO_LAYOUT_CONFIG` for precise text positioning.
   - [x] **Render Logic**: Completed `renderPro` with support for image background + AI text overlays.
-  - [x] **Cloud Migration**: Firebase Storage への画像移行ツール (`/api/migrate`) の実装とUIのクラウドURL化。
 - [x] **PCメモリ・ディスク軽量化**
   - [x] 不要パッケージ（playwright, radix-ui, opentelemetry等）の削除。
   - [x] ブラウザバイナリおよびビルドキャッシュのクリーンアップ。
+- [x] **Phase 24: PDF Background Integration & Conversion Stability (2026-02-20)**
+  - [x] `pdfjs-dist` v5 に適合したワーカー設定（.mjs 拡張子への修正）。
+  - [x] 解像度向上のためのスケール調整（3.0倍）とキャンバス描画ロジックの改善。
+  - [x] ファイルアップロード時のフィードバック（トースト通知）の強化。
+- [x] **Phase 25: POP Maker UI/UX Enhancement (2026-02-20)**
+  - [x] **Undo (元に戻す)**: 20ステップの編集履歴管理を実装。
+  - [x] **Eraser (個別クリア)**: 商品写真・背景の個別リセット機能。
+  - [x] **Individual Font Sizing**: 商品名、価格などの項目ごとにサイズ調整UIを追加。
+  - [x] **Quick Font Selection**: 主要フォントをワンタップで切り替えられるチップUIの実装。
 
 ---
 
-### 過去の個別UI・機能改善タスク（task.mdより統合）
+## 過去の個別UI・機能改善タスク（task.mdより統合）
 
 - [x] **料金・プラン表示の細部調整**
   - 年払い選択時の「17%お得！」バッジ表示およびアニメーション実装。
@@ -182,3 +201,34 @@
 - [x] **ブランド刷新対応**
   - `usePlanGuard.ts` 等のプラン名称定数の置換と正規化。
   - Whop/Instagram 等の外部連携プラン識別子の同期。
+
+---
+
+## プラン別AIモデル差別化（2026-02-20 実装完了）
+
+- [x] `src/lib/vertex-ai.ts`: `getPlanAiPolicy()` ヘルパー追加
+  - Standard: main=2.5-flash, sub=3-flash-preview(LOW)
+  - Pro/Pro Premium: main=3-flash-preview(LOW), sub=2.5-flash
+- [x] `src/app/api/generate-reply/route.ts`: プラン別モデル + 機能別パラメータ適用
+  - Standardプランの★1〜2低評価時: サブモデル(3-flash LOW)を先行使用
+  - temperature:0.3 / top_p:0.85 / top_k:30 / max_output_tokens:220
+- [x] `src/app/api/instagram/analyze/route.ts`: プラン別モデル選択
+  - temperature:0.7 / top_p:0.9 / top_k:40 / max_output_tokens:350
+- [x] `src/app/api/accounting/analyze/route.ts`: プランのメインモデルを使用
+  - Standard=2.5-flash / Pro・Pro Premium=3-flash-preview(LOW)
+  - temperature:0.1 / top_p:0.7 / top_k:20 / max_output_tokens:256
+- [x] `src/app/api/ai/adjust-text/route.ts`: プラン別モデル適用
+  - temperature:0.7 / top_p:0.9 / top_k:40 / max_output_tokens:350
+- [x] `20_開発ナレッジ/AI_SPECIFICATIONS.md`: 確定仕様で全面更新
+
+---
+
+## POP制作ツール：フォント選択肢の拡充（2026-02-20 実装完了）
+
+- [x] `src/app/dashboard/tools/pop-maker/fonts.css`: メイリオ（.font-meiryo）クラスの追加
+- [x] `src/app/dashboard/tools/pop-maker/page.tsx`: フォント選択UI全面刷新
+  - 旧: 5種類（ゴシック、明朝、丸ゴシック、ドット、装飾）
+  - 新: 21種類（和文11種 + 欧文10種）カテゴリー分け表示
+  - クイックチップ（人気6種）+ カテゴリー別グリッドUI
+  - FONT_FAMILY_MAP導入（フォントID→CSS font-family値の正確な変換）
+  - 旧セクション4「文字のフォント」をAI提案カードに統合

@@ -1,9 +1,9 @@
 "use server";
-import { getGenerativeModel } from "@/lib/vertex-ai";
+import { getGenerativeModel, AI_POLICY } from "@/lib/vertex-ai";
 
 /**
  * AIによるPOP用コピー生成 (Vertex AI版)
- * 運用規則に基づき、安定した 2.5-flash モデルをメインで使用します。
+ * 運用規則に基づき、Gemini 3 Flash (Main) を LOW 設定で使用します。
  */
 export async function generatePopCopy(data: {
     productName: string;
@@ -12,7 +12,9 @@ export async function generatePopCopy(data: {
     features: string;
     style: string;
 }) {
-    const model = getGenerativeModel("gemini-2.5-flash");
+    const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
+    let responseText: string | null = null;
+    let lastError: any = null;
 
     const prompt = `
 あなたはプロの飲食コンサルタント兼コピーライターです。
@@ -36,22 +38,190 @@ export async function generatePopCopy(data: {
 }
 `;
 
-    try {
-        const result = await model.generateContent(prompt);
-        const response = (result as any).response;
-        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    for (const modelName of targetModels) {
+        try {
+            const model = getGenerativeModel(modelName);
+            const generationConfig: any = {};
+            // メインの Gemini 3系には思考レベル LOW を適用
+            if (modelName === AI_POLICY.PRIMARY) {
+                Object.assign(generationConfig, AI_POLICY.THINKING_CONFIG_LOW);
+            }
 
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig
+            });
+
+            const response = (result as any).response;
+            responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            if (responseText) break;
+        } catch (error: any) {
+            console.warn(`POP COPY retryable error for ${modelName}:`, error.message);
+            lastError = error;
         }
+    }
 
-        throw new Error("Invalid format from AI");
-    } catch (error) {
-        console.error("AI Generation Error (Vertex AI):", error);
+    if (!responseText) {
+        console.error("AI Generation Error (Vertex AI):", lastError);
         return {
             catchphrase: "新登場の逸品",
             description: `${data.productName}。厳選素材を使用した店長自信の味をぜひ。`,
         };
     }
+
+    try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        throw new Error("Invalid format from AI");
+    } catch (error) {
+        console.error("JSON Parse Error:", error);
+        return {
+            catchphrase: "新登場の逸品",
+            description: `${data.productName}。厳選素材を使用した店長自信の味をぜひ。`,
+        };
+    }
+}
+
+/**
+ * クチコミを売れるコピーに変換 (V6: Competitive Superiority)
+ */
+export async function generateReviewCopy(data: {
+    review: string;
+    productName: string;
+}) {
+    const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
+    let responseText: string | null = null;
+    let lastError: any = null;
+
+    const prompt = `
+あなたは天才コピーライターです。お客様からいただいた「クチコミ」を元に、新規客が思わず注文したくなる「魅惑の広告コピー」を作成してください。
+
+【お客様のクチコミ】
+"${data.review}"
+
+【対象商品】
+${data.productName}
+
+【出力内容】
+1. キャッチコピー (15文字以内、クチコミの熱量を活かしつつキャッチーに)
+2. 紹介文 (80文字以内、お客様の声を第3者の証言として活用し、信頼感とシズル感を両立。ですます調)
+
+返信は以下のJSON形式のみで返してください。
+{
+  "catchphrase": "...",
+  "description": "..."
+}
+`;
+
+    for (const modelName of targetModels) {
+        try {
+            const model = getGenerativeModel(modelName);
+            const generationConfig: any = {};
+            if (modelName === AI_POLICY.PRIMARY) {
+                Object.assign(generationConfig, AI_POLICY.THINKING_CONFIG_LOW);
+            }
+
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig
+            });
+
+            const response = (result as any).response;
+            responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            if (responseText) break;
+        } catch (error: any) {
+            console.warn(`REVIEW COPY retryable error for ${modelName}:`, error.message);
+            lastError = error;
+        }
+    }
+
+    if (!responseText) {
+        return {
+            catchphrase: "お客様絶賛の味",
+            description: "多くのお客様から高い評価をいただいている自慢の一品です。",
+        };
+    }
+
+    try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) return JSON.parse(jsonMatch[0]);
+        throw new Error("Invalid format");
+    } catch (error) {
+        return {
+            catchphrase: "お客様絶賛の味",
+            description: "多くのお客様から高い評価をいただいている自慢の一品です。",
+        };
+    }
+}
+
+/**
+ * 画像の雰囲気から最適なフォントを提案 (V8: AI Font Matcher)
+ */
+export async function suggestFontFromImage(imageBase64: string) {
+    const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
+    let responseText: string | null = null;
+    let lastError: any = null;
+
+    const prompt = `
+画像のデザイン（色、雰囲気、スタイル）を分析し、以下のフォントリストの中から、このデザインに最も合うものを1つだけ選んでください。
+返信は、以下の「キー」の名前のみを返してください。解説は一切不要です。
+
+【フォントリスト】
+- font-noto-serif (明朝体: 和食、高級、伝統)
+- font-noto-sans (ゴシック体: モダン、汎用、シンプル)
+- font-yuji (筆文字: 居酒屋、力強い、和風)
+- font-inter (サンセリフ: カフェ、おしゃれ、ミニマル)
+- font-playfair (セリフ: ラグジュアリー、ワイン、洋風)
+- font-bebas (インパクト: セール、太字、力強い)
+
+返信例: font-noto-serif
+`;
+
+    // Base64のヘッダーを削除（もしあれば）
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+
+    for (const modelName of targetModels) {
+        try {
+            const model = getGenerativeModel(modelName);
+            const generationConfig: any = {};
+            if (modelName === AI_POLICY.PRIMARY) {
+                Object.assign(generationConfig, AI_POLICY.THINKING_CONFIG_LOW);
+            }
+
+            const result = await model.generateContent({
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/png",
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }
+                ],
+                generationConfig
+            });
+
+            const response = (result as any).response;
+            responseText = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+            if (responseText) break;
+        } catch (error: any) {
+            console.warn(`FONT MATCHER retryable error for ${modelName}:`, error.message);
+            lastError = error;
+        }
+    }
+
+    if (!responseText) return "font-noto-sans";
+
+    // キーのみを抽出
+    const validFonts = ["font-noto-serif", "font-noto-sans", "font-yuji", "font-inter", "font-playfair", "font-bebas"];
+    const matched = validFonts.find(f => responseText.includes(f));
+
+    return matched || "font-noto-sans";
 }

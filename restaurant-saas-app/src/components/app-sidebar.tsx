@@ -28,7 +28,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ activePage, activeSubPage, onSubPageChange, user, stats, announcements = [] }: AppSidebarProps) {
-    const { isWebPlan } = usePlanGuard();
+    const { isWebPlan, planName: guardPlanName } = usePlanGuard();
 
     return (
         <aside className="hidden md:flex w-64 border-r bg-sidebar text-sidebar-foreground flex-col h-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -206,7 +206,7 @@ export function AppSidebar({ activePage, activeSubPage, onSubPageChange, user, s
                                         {user.displayName || user.email?.split('@')[0]}
                                     </span>
                                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">
-                                        {stats?.planName || "LITE"}
+                                        {guardPlanName || "LITE"}
                                     </span>
                                 </div>
                             </div>

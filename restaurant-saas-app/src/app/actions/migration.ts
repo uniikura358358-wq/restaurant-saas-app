@@ -7,7 +7,7 @@ import path from "path";
 const PUBLIC_IMAGES_DIR = path.join(process.cwd(), "public", "images");
 
 /**
- * public/images 以下のファイルを Firebase Storage へ一括アップロードする
+ * public/images 以下のファイルを Firebase Storage (restaurant-saas-2026) へ一括アップロードする
  */
 export async function migrateImagesToStorage() {
     const results: { path: string; status: "success" | "error"; message?: string }[] = [];
@@ -16,7 +16,7 @@ export async function migrateImagesToStorage() {
         return { success: false, message: "public/images フォルダが見つかりません" };
     }
 
-    const bucket = adminStorage.bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+    const bucket = adminStorage.bucket();
 
     async function walkAndUpload(dir: string) {
         const files = fs.readdirSync(dir);

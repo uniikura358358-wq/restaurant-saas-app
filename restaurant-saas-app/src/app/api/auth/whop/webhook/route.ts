@@ -17,7 +17,6 @@ export async function POST(request: Request) {
 
         if (!secret) {
             console.error('WHOP_WEBHOOK_SECRET is not configured');
-            // Allow build to pass even if secret missing
             return NextResponse.json({ error: 'Configuration Error' }, { status: 500 });
         }
 
@@ -50,23 +49,14 @@ export async function POST(request: Request) {
                 }
 
                 // Find user in Firebase Auth
-                const { adminAuthSecondary, getDbForUser } = await import('@/lib/firebase-admin');
                 let uid: string;
                 try {
                     const userRecord = await adminAuth.getUserByEmail(email);
                     uid = userRecord.uid;
                 } catch (error: any) {
                     if (error.code === 'auth/user-not-found') {
-                        try {
-                            const userRecord = await adminAuthSecondary.getUserByEmail(email);
-                            uid = userRecord.uid;
-                        } catch (secError: any) {
-                            if (secError.code === 'auth/user-not-found') {
-                                console.log(`User not found for email: ${email}. Skipping sync.`);
-                                return NextResponse.json({ success: true, message: 'User not found' });
-                            }
-                            throw secError;
-                        }
+                        console.log(`User not found for email: ${email}. Skipping sync.`);
+                        return NextResponse.json({ success: true, message: 'User not found' });
                     } else {
                         throw error;
                     }
@@ -81,7 +71,7 @@ export async function POST(request: Request) {
 
                 // Update Firestore Profile
                 try {
-                    const db = await getDbForUser(uid);
+                    const db = adminDb;
                     await db.collection('users').doc(uid).set({
                         plan: planName.toLowerCase(), // 'business' | 'light' | 'web light'
                         subscriptionStatus: planStatus,

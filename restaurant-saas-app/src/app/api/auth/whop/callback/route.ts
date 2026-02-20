@@ -15,7 +15,6 @@ export async function GET(request: Request) {
         }
 
         // 1. Whop Token Exchange
-        // (環境変数は .env.local から取得)
         const tokenRes = await fetch('https://whop.com/oauth/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -37,7 +36,7 @@ export async function GET(request: Request) {
         const tokens = await tokenRes.json();
         const accessToken = tokens.access_token;
 
-        // 2. Fetch User Info from Whop (to get email/id)
+        // 2. Fetch User Info from Whop
         const userRes = await fetch('https://api.whop.com/api/v2/me', {
             headers: { 'Authorization': `Bearer ${accessToken}` },
         });
@@ -56,46 +55,25 @@ export async function GET(request: Request) {
         const planStatus = (hasBusiness || hasLight) ? 'active' : 'web Light';
         const planName = hasBusiness ? 'Business' : (hasLight ? 'Light' : 'web Light');
 
-        // 4. Update or Create User in Firebase (Linking Whop to Firebase)
-        const { adminAuthSecondary, getDbForUser } = await import('@/lib/firebase-admin');
-
+        // 4. Update or Create User in Firebase
         let uid = "";
-        let isNewUser = false;
-        let activeAuth = adminAuth; // Default to primary
-
         try {
-            // Try primary first
             const userRecord = await adminAuth.getUserByEmail(whopUser.email);
             uid = userRecord.uid;
-            activeAuth = adminAuth;
         } catch (error: any) {
             if (error.code === 'auth/user-not-found') {
-                try {
-                    // Try secondary
-                    const userRecord = await adminAuthSecondary.getUserByEmail(whopUser.email);
-                    uid = userRecord.uid;
-                    activeAuth = adminAuthSecondary;
-                } catch (secError: any) {
-                    if (secError.code === 'auth/user-not-found') {
-                        // Create in SECONDARY (assuming it's the new project/default for others)
-                        const newUser = await adminAuthSecondary.createUser({
-                            email: whopUser.email,
-                            emailVerified: true,
-                        });
-                        uid = newUser.uid;
-                        activeAuth = adminAuthSecondary;
-                        isNewUser = true;
-                    } else {
-                        throw secError;
-                    }
-                }
+                const newUser = await adminAuth.createUser({
+                    email: whopUser.email,
+                    emailVerified: true,
+                });
+                uid = newUser.uid;
             } else {
                 throw error;
             }
         }
 
         // 5. Sync Plan to Profile (Firestore)
-        const db = await getDbForUser(uid);
+        const db = adminDb;
         await db.collection('users').doc(uid).set({
             email: whopUser.email,
             whopId: whopUser.id,
@@ -106,8 +84,8 @@ export async function GET(request: Request) {
             lastLoginAt: FieldValue.serverTimestamp(),
         }, { merge: true });
 
-        // 6. Create a Custom Token for the user to sign in on client (using the correct Auth instance)
-        const customToken = await activeAuth.createCustomToken(uid, {
+        // 6. Create a Custom Token for the user to sign in on client
+        const customToken = await adminAuth.createCustomToken(uid, {
             plan: planName.toLowerCase()
         });
 
@@ -115,8 +93,6 @@ export async function GET(request: Request) {
 
     } catch (error) {
         console.error('Whop Callback Error:', error);
-        // Fallback for build time or runtime errors
-        // Try to redirect if origin is available, otherwise json
         try {
             const origin = new URL(request.url).origin;
             return NextResponse.redirect(`${origin}/login?error=callback_error`);

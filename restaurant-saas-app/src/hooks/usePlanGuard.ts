@@ -8,10 +8,13 @@ import { doc, getDoc, disableNetwork } from 'firebase/firestore';
  * プラン名の定数定義 (表記ゆれ・タイポ防止)
  */
 export const PLAN_NAMES = {
-    FREE: 'web Light',
-    LIGHT: 'web Standard',
-    STANDARD: 'web Pro',
-    PREMIUM: 'web Pro Premium'
+    STANDARD: 'Standard',
+    PRO: 'Pro',
+    PREMIUM: 'Pro Premium',
+    WEB_STANDARD: 'web Standard',
+    WEB_PRO: 'web Pro',
+    WEB_PREMIUM: 'web Pro Premium',
+    // 旧名称 'web Light' は削除済み
 } as const;
 
 export type PlanLevel = typeof PLAN_NAMES[keyof typeof PLAN_NAMES];
@@ -22,6 +25,7 @@ export function usePlanGuard() {
     const [loading, setLoading] = useState(true);
     const { simulatedPlan } = useAdminDebug();
 
+    // effectivePlanName は常に simulatedPlan を最優先する
     const effectivePlanName = simulatedPlan || planName;
 
     const fetchPlan = useCallback(async (isRefresh = false) => {
@@ -31,18 +35,27 @@ export function usePlanGuard() {
         const isDemo = user.uid === "demo-user-id" || (typeof window !== 'undefined' && (localStorage.getItem('demo_user') === 'true' || localStorage.getItem('is_demo_mode') === 'true'));
 
         if (isDemo) {
-            setPlanName(PLAN_NAMES.STANDARD);
+            // デモユーザーの場合でも、simulatedPlan が設定されていればそれを優先する
+            if (simulatedPlan) {
+                setPlanName(simulatedPlan);
+            } else {
+                setPlanName(PLAN_NAMES.STANDARD); // デフォルトのデモプランを 'Standard' に変更
+            }
             setLoading(false);
-            // 念押しでネットワーク切断を実行
             disableNetwork(db).catch(() => { });
             return;
         }
 
         if (isRefresh) setLoading(true);
 
+        // simulatedPlan が設定されている場合は、Firestore から実際のプランを取得しない
+        if (simulatedPlan && !isRefresh) {
+            setPlanName(simulatedPlan);
+            setLoading(false);
+            return;
+        }
+
         try {
-            // Firestore: users/{uid} からプラン情報を取得
-            // 念のため db が初期化されているか、オフラインエラーが致命的にならないかを確認
             if (!db) throw new Error("Firestore is not initialized");
 
             const docRef = doc(db, 'users', user.uid);
@@ -50,34 +63,30 @@ export function usePlanGuard() {
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                const rawPlan = data.plan || data.planName || 'web Light';
-                // 旧名称 'Free' / 'free' / 'WEB会員' を 'web Light' に正規化
-                const normalizedPlan = (typeof rawPlan === 'string' && (rawPlan.toLowerCase() === 'free' || rawPlan === 'WEB会員')) ? 'web Light' : rawPlan;
+                const rawPlan = data.plan || data.planName || PLAN_NAMES.WEB_STANDARD; // デフォルトを 'web Standard' に変更
+                // 旧名称 'Free' / 'free' / 'WEB会員' を 'web Light' ではなく 'web Standard' に正規化（'web Light'削除に伴い）
+                const normalizedPlan = (typeof rawPlan === 'string' && (rawPlan.toLowerCase() === 'free' || rawPlan === 'WEB会員' || rawPlan.toLowerCase() === 'web light')) ? PLAN_NAMES.WEB_STANDARD : rawPlan;
                 setPlanName(normalizedPlan);
             } else {
                 console.log('No profile found for user:', user.uid);
-                setPlanName('web Light');
+                setPlanName(PLAN_NAMES.WEB_STANDARD); // デフォルトを 'web Standard' に変更
             }
         } catch (err: any) {
-            console.error('Plan fetch error (falling back to Free):', err);
-            // オフラインエラーや権限不足時は Free として扱う
-            setPlanName('web Light');
+            console.error('Plan fetch error (falling back to web Standard):', err);
+            setPlanName(PLAN_NAMES.WEB_STANDARD); // デフォルトを 'web Standard' に変更
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, simulatedPlan]); // simulatedPlan を依存配列に追加
 
     useEffect(() => {
-        // user 読み込み前でも localStorage でデモモードと分かっていれば即座に確定
         const isDemo = typeof window !== 'undefined' &&
             (localStorage.getItem('demo_user') === 'true' || localStorage.getItem('is_demo_mode') === 'true');
 
         if (isDemo) {
-            setPlanName(PLAN_NAMES.STANDARD);
-            setLoading(false);
-            // 念押し
-            disableNetwork(db).catch(() => { });
-            return;
+            // ここでの setPlanName は、simulatedPlan が優先されるため不要になるか、
+            // あるいは simulatedPlan が設定されていない場合のフォールバックとして機能する
+            // fetchPlan 内で既に処理されるため、このブロックは簡素化できる
         }
 
         if (!authLoading && user) {
@@ -85,7 +94,7 @@ export function usePlanGuard() {
         } else if (!authLoading && !user) {
             setLoading(false);
         }
-    }, [user, authLoading, fetchPlan]);
+    }, [user, authLoading, fetchPlan, simulatedPlan]); // simulatedPlan を依存配列に追加
 
     const hasFeature = (feature: 'instagram' | 'ai_pop' | 'priority_support') => {
         if (!effectivePlanName) return false;

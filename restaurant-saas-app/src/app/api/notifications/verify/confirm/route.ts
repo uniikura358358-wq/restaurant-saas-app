@@ -29,27 +29,13 @@ export async function GET(request: Request) {
             );
         }
 
-        // 1. トークン検索（プロジェクトを跨いで検索）
-        const { adminDbSecondary, getDbForUser } = await import("@/lib/firebase-admin");
-
-        let snapshot = await adminDb.collection("verificationCodes")
+        // 1. トークン検索
+        const snapshot = await adminDb.collection("verificationCodes")
             .where("token", "==", token)
             .where("channel", "==", "email")
             .where("verified", "==", false)
             .limit(1)
             .get();
-
-        let db = adminDb;
-
-        if (snapshot.empty) {
-            snapshot = await adminDbSecondary.collection("verificationCodes")
-                .where("token", "==", token)
-                .where("channel", "==", "email")
-                .where("verified", "==", false)
-                .limit(1)
-                .get();
-            db = adminDbSecondary;
-        }
 
         if (snapshot.empty) {
             return NextResponse.redirect(
@@ -72,8 +58,7 @@ export async function GET(request: Request) {
         await verificationDoc.ref.update({ verified: true });
 
         // users/{userId} の notificationConfig を更新
-        // db は上で特定されたものを使用
-        const userRef = db.collection("users").doc(userId);
+        const userRef = adminDb.collection("users").doc(userId);
         const userDoc = await userRef.get();
 
         if (userDoc.exists) {
@@ -98,7 +83,6 @@ export async function GET(request: Request) {
 
     } catch (error: any) {
         console.error("Verify Confirm Error:", error);
-        // リダイレクトでエラーを伝える
         const origin = new URL(request.url).origin;
         return NextResponse.redirect(
             `${origin}/settings/account?verify_error=server_error`
@@ -128,8 +112,7 @@ export async function POST(request: Request) {
         }
         const uid = user.uid;
 
-        const { getDbForUser } = await import("@/lib/firebase-admin");
-        const db = await getDbForUser(uid);
+        const db = adminDb;
 
         // OTPコード検索
         const snapshot = await db.collection("verificationCodes")

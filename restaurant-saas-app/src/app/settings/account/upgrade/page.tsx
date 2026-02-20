@@ -10,7 +10,7 @@ import { usePlanGuard, PLAN_NAMES } from "@/hooks/usePlanGuard";
 
 const ALL_UPGRADE_PLANS = [
     {
-        id: PLAN_NAMES.LIGHT,
+        id: PLAN_NAMES.WEB_STANDARD,
         name: "web Standard",
         price: "3,980",
         description: "Googleマップ対策を自動化し、新規来店を促進。",
@@ -66,7 +66,7 @@ export default function HPUpgradePage() {
     const { planName, loading } = usePlanGuard();
 
     // 現在のプランインデックスを取得
-    const planOrder = [PLAN_NAMES.FREE, PLAN_NAMES.LIGHT, PLAN_NAMES.STANDARD, PLAN_NAMES.PREMIUM];
+    const planOrder = [PLAN_NAMES.STANDARD, PLAN_NAMES.WEB_STANDARD, PLAN_NAMES.STANDARD, PLAN_NAMES.PREMIUM];
     const currentPlanIndex = planOrder.indexOf(planName as any);
 
     // 1つ上と2つ上のプランを抽出

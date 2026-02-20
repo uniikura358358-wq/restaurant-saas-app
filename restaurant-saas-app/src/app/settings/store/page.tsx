@@ -568,6 +568,13 @@ function StoreSettingsContent() {
                                             <span>基本情報</span>
                                         </TabsTrigger>
                                         <TabsTrigger
+                                            value="pos"
+                                            className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
+                                        >
+                                            <RefreshCcw className="size-4 text-indigo-500" />
+                                            <span>POS連携</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger
                                             value="testing"
                                             className="rounded-xl px-4 py-2 gap-2 data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:border-2 data-[state=active]:border-primary/50 transition-all duration-200 font-medium"
                                         >
@@ -821,7 +828,7 @@ function StoreSettingsContent() {
                                                                                 ...prev,
                                                                                 reply_templates: {
                                                                                     ...prev.reply_templates,
-                                                                                    [star]: { ...prev.reply_templates[star], body: nextBody }
+                                                                                    [star]: { ...prev.reply_templates[star], body: e.target.value }
                                                                                 }
                                                                             }))}
                                                                             rows={6}
@@ -989,6 +996,76 @@ function StoreSettingsContent() {
                                                         </div>
                                                     </CardContent>
                                                 </div>
+                                            </Card>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="pos">
+                                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <Card className="shadow-md border-indigo-100 bg-indigo-50/5 overflow-hidden">
+                                                <CardHeader className="bg-indigo-50/30 border-b border-indigo-100/50">
+                                                    <CardTitle className="flex items-center gap-2 text-indigo-700">
+                                                        <RefreshCcw className="size-5" />
+                                                        POSレジ外部連携設定
+                                                    </CardTitle>
+                                                    <div className="text-sm text-indigo-600/80 mt-1">
+                                                        AirレジやSquareと連携することで、売上データを自動取得しAI分析を強化します。
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="pt-8 space-y-8">
+                                                    {/* Airレジ連携 */}
+                                                    <div className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-indigo-50 shadow-sm hover:border-indigo-100 transition-all group">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="size-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold group-hover:scale-110 transition-transform">
+                                                                Air
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-800">Airレジ（リクルート）</h4>
+                                                                <p className="text-xs text-gray-500">売上、客数、客単価データを同期します。</p>
+                                                            </div>
+                                                        </div>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="border-blue-200 text-blue-600 hover:bg-blue-50 font-bold"
+                                                            onClick={() => toast.info("Airレジ連携機能を準備中です")}
+                                                        >
+                                                            連携を開始
+                                                        </Button>
+                                                    </div>
+
+                                                    {/* Square連携 */}
+                                                    <div className="flex items-center justify-between p-6 bg-white rounded-2xl border-2 border-indigo-50 shadow-sm hover:border-indigo-100 transition-all group">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="size-12 rounded-xl bg-gray-900 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                                                                <Smartphone className="size-6" />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-800">Square</h4>
+                                                                <p className="text-xs text-gray-500">決済データと在庫情報を同期します。</p>
+                                                            </div>
+                                                        </div>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="border-gray-300 text-gray-700 hover:bg-gray-50 font-bold"
+                                                            onClick={() => toast.info("Square連携機能を準備中です")}
+                                                        >
+                                                            連携を開始
+                                                        </Button>
+                                                    </div>
+
+                                                    <div className="p-5 bg-amber-50 border border-amber-100 rounded-2xl flex gap-4">
+                                                        <div className="bg-white p-3 rounded-full shadow-sm self-start">
+                                                            <Lock className="size-5 text-amber-500" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <h4 className="text-sm font-bold text-amber-900">セキュリティ・機密情報の取り扱い</h4>
+                                                            <p className="text-xs text-amber-800/70 leading-relaxed">
+                                                                外部サービスとの連携はOAuth2.0による安全な認証方式を採用しています。
+                                                                お客様のパスワードを当サービスが保存することはありません。
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
                                             </Card>
                                         </div>
                                     </TabsContent>

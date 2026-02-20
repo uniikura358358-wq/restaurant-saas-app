@@ -106,14 +106,31 @@ export async function POST(request: Request) {
 
         const truncatedReviewText = reviewText.slice(0, MAX_REVIEW_TEXT_LENGTH);
 
-        // Vertex AI 移行 (運用規則に基づき Flash 優先)
-        // 503 Service Unavailable (過負荷) を避けるため、安定した Flash モデルを最優先する
-        // 非推奨モデル(1.5等)を排除し、2.5(メイン)と3(サブ)の構成で運用
-        const targetModels = ['gemini-2.5-flash', 'gemini-3-flash-preview'];
+        // プラン別モデルポリシー取得
+        // Standard: 基本=2.5-Flash / ★1〜2(低評価・クレーム)=3-Flash LOW
+        // Pro/Pro Premium: 3-Flash LOW → 2.5-Flash(fallback)
+        const { AI_POLICY, getPlanAiPolicy } = await import("@/lib/vertex-ai");
+        const planPolicy = getPlanAiPolicy(planName);
+
+        // Standardプランかつ低評価（★1〜2）の場合はメイン/サブを反転し、3-Flash LOWを優先使用
+        const plan = (planName || '').toLowerCase();
+        const isStandard = !plan.includes('pro') && !plan.includes('premium');
+        const isLowRating = typeof starRating === 'number' && starRating <= 2;
+        const useSubFirst = isStandard && isLowRating;
+
+        const targetModels = useSubFirst
+            ? [planPolicy.secondary, planPolicy.primary]   // 3-Flash LOW → 2.5-Flash
+            : [planPolicy.primary, planPolicy.secondary];  // プランデフォルト順
+        const thinkingFlags = useSubFirst
+            ? [planPolicy.secondaryNeedsThinking, planPolicy.primaryNeedsThinking]
+            : [planPolicy.primaryNeedsThinking, planPolicy.secondaryNeedsThinking];
+
         let responseText: string | null = null;
         let lastError: unknown = null;
 
-        for (const modelName of targetModels) {
+
+        for (const [idx, modelName] of targetModels.entries()) {
+            const needsThinking = thinkingFlags[idx];
             try {
                 const model = getGenerativeModel(modelName);
                 const prompt = buildGeneratorPrompt({
@@ -123,10 +140,16 @@ export async function POST(request: Request) {
                     config,
                 });
 
-                const generationConfig: any = {};
-                // Gemini 3系かつサブで使用する場合は思考レベルを LOW に制限してコストを抑制
-                if (modelName.includes('gemini-3')) {
-                    generationConfig.thinking_config = { include_thoughts: false, thinking_level: 'LOW' };
+                // 口コミ返信用パラメータ
+                const generationConfig: any = {
+                    temperature: 0.3,
+                    topP: 0.85,
+                    topK: 30,
+                    maxOutputTokens: 220,
+                };
+                // Gemini 3系(Low設定)の場合のみ thinking_config を追加
+                if (needsThinking) {
+                    Object.assign(generationConfig, AI_POLICY.THINKING_CONFIG_LOW);
                 }
 
                 const modelTimeout = modelName.includes("pro") ? 40_000 : 25_000;

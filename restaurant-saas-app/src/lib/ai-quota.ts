@@ -36,16 +36,16 @@ export function getCurrentMonth(): string {
 
 export const AI_LIMITS: Record<string, number> = {
     'web Light': 0,
-    'web Standard': 50,
+    'web Standard': 60,
     'web Pro': 200,
-    'web Pro Premium': 450,
+    'web Pro Premium': 300,
     // 互換性維持
-    'Standard': 50,
+    'Standard': 60,
     'Pro': 200,
-    'Pro Premium': 450,
+    'Pro Premium': 300,
     'free': 0,
-    'standard': 50,
-    'premium': 450,
+    'standard': 60,
+    'premium': 300,
     'pro': 200,
     'default': 0
 };

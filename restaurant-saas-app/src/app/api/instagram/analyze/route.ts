@@ -85,16 +85,37 @@ export async function POST(request: Request) {
         const arrayBuffer = await file.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-        const targetModels = [DEFAULT_AI_MODEL, DEFAULT_FALLBACK_MODEL];
+        const prompt =
+            "この料理の画像を分析し、Instagram投稿のキャプション生成に役立つ情報を抽出してください。以下のJSON形式でのみ出力すること。\n" +
+            "{\n" +
+            '  "dish_name": "具体的な料理名（例: 濃厚魚介豚骨ラーメン）",\n' +
+            '  "visual_features": "見た目の特徴、シズル感（例: 湯気が立っている、チャーシューが分厚い、スープが濃厚そう）",\n' +
+            '  "key_ingredients": ["主要食材1", "主要食材2"],\n' +
+            '  "suggested_hashtags_base": ["料理カテゴリ", "利用シーン"]\n' +
+            "}";
+
+        // プラン別モデルポリシー取得（getPlanAiPolicy）
+        // Standard: 2.5-Flash(main) → 3-Flash-Preview(LOW)(fallback)
+        // Pro/Pro Premium: 3-Flash-Preview(LOW)(main) → 2.5-Flash(fallback)
+        const { AI_POLICY, getPlanAiPolicy } = await import("@/lib/vertex-ai");
+        const planPolicy = getPlanAiPolicy(userPlan);
+        const targetModels = [planPolicy.primary, planPolicy.secondary];
         let responseText: string | null = null;
         let lastError: any = null;
 
-        for (const modelName of targetModels) {
+        for (const [idx, modelName] of targetModels.entries()) {
+            const needsThinking = idx === 0 ? planPolicy.primaryNeedsThinking : planPolicy.secondaryNeedsThinking;
             try {
                 const model = getGenerativeModel(modelName);
-                const generationConfig: any = {};
-                if (modelName.includes('gemini-3')) {
-                    generationConfig.thinking_config = { include_thoughts: false, thinking_level: 'LOW' };
+                // Instagramキャプション生成用パラメータ
+                const generationConfig: any = {
+                    temperature: 0.7,
+                    topP: 0.9,
+                    topK: 40,
+                    maxOutputTokens: 350,
+                };
+                if (needsThinking) {
+                    generationConfig.thinking_config = AI_POLICY.THINKING_CONFIG_LOW.thinking_config;
                 }
 
                 const result = await Promise.race([
@@ -147,29 +168,21 @@ export async function POST(request: Request) {
                 },
             }
         );
-    } catch (error: unknown) {
-        if (error instanceof Error && error.message === "TIMEOUT") {
+    } catch (error: any) {
+        console.error("Analyze Error:", error);
+        if (error?.message === "TIMEOUT") {
             return NextResponse.json(
                 { error: "通信がタイムアウトしました。電波の良い場所で再度お試しください" },
                 { status: 504, headers: { "Cache-Control": "no-store" } }
             );
         }
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
+        try {
+            return NextResponse.json(
+                { error: "画像解析に失敗しました" },
+                { status: 500, headers: { "Cache-Control": "no-store" } }
+            );
+        } catch {
+            return new NextResponse("Internal Server Error", { status: 500 });
+        }
     }
-} catch (error: any) {
-    console.error("Analyze Error:", error);
-    try {
-        // Try to return a valid JSON error even if build fails? 
-        // Or just return 500.
-        return NextResponse.json(
-            { error: "画像解析に失敗しました" },
-            { status: 500, headers: { "Cache-Control": "no-store" } }
-        );
-    } catch {
-        // Absolute fallback
-        return new NextResponse("Internal Server Error", { status: 500 });
-    }
-}
 }

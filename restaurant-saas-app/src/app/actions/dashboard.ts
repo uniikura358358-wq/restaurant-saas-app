@@ -1,6 +1,6 @@
 "use server";
 
-import { adminDb, adminAuth, adminDbSecondary, getDbForUser } from "@/lib/firebase-admin";
+import { adminDb, adminAuth, getDbForUser } from "@/lib/firebase-admin";
 import { DashboardStats, FirestoreReview, Announcement } from "@/types/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { headers, cookies } from "next/headers";
@@ -48,11 +48,19 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
     const uid = await verifyUser(idToken);
     const cookieStore = await cookies();
 
+    // Cookieから偽装プラン（simulated_plan）を取得
+    const simulatedPlan = cookieStore.get('simulated_plan')?.value;
+
     try {
         // Demoモード判定: 明示的に demo-user-id である場合のみに制限
         const isDemo = uid === "demo-user-id";
 
         if (isDemo) {
+            const currentPlan = simulatedPlan || "Standard";
+            const { getAiLimitByPlan } = await import("@/lib/ai-quota");
+            const textLimits = getAiLimitByPlan(currentPlan, 'text');
+            const imageLimits = getAiLimitByPlan(currentPlan, 'image');
+
             // Cookieから返信済みIDリストを取得
             const repliedCookie = cookieStore.get('replied_reviews')?.value || cookieStore.get('demo_replied_ids')?.value || '';
             let repliedIds: string[] = [];
@@ -90,16 +98,16 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
                 aiUsage: {
                     text: {
                         sent: aiUsageCount,
-                        limit: 2000,
-                        remaining: Math.max(0, 2000 - aiUsageCount)
+                        limit: textLimits.count,
+                        remaining: Math.max(0, textLimits.count - aiUsageCount)
                     },
                     image: {
                         sent: 12,
-                        limit: 60,
-                        remaining: 48
+                        limit: imageLimits.count,
+                        remaining: Math.max(0, imageLimits.count - 12)
                     }
                 },
-                planName: "Standard",
+                planName: currentPlan,
                 storeName: "デモ店舗 (Demo Store)",
                 nextPaymentDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
                 updatedAt: new Date(),
@@ -121,13 +129,12 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
 
         const statsData = statsSnap.data();
         const userData = userSnap.data();
+        const activePlan = simulatedPlan || userData?.plan || "web Light";
 
         // 2. AIクォータ情報の取得 (activeDb を使用)
-        // checkAiQuota 内部でも adminDb を使っている可能性があるため注意が必要だが、
-        // 今回はシンプルに stats/user データが取れた方の DB を基準にするロジックを優先
         const [textQuota, imageQuota] = await Promise.all([
-            checkAiQuota(uid, userData?.plan || "web Light", 'text'),
-            checkAiQuota(uid, userData?.plan || "web Light", 'image')
+            checkAiQuota(uid, activePlan, 'text'),
+            checkAiQuota(uid, activePlan, 'image')
         ]);
 
         // 3. 店舗情報の取得 (取得に成功した DB を使用)
@@ -153,7 +160,7 @@ export async function getDashboardStats(idToken: string): Promise<DashboardStats
                     remaining: imageQuota.usage.remaining
                 }
             },
-            planName: userData?.plan || "web Light",
+            planName: activePlan,
             storeName: storeData?.storeName || "",
             nextPaymentDate: userData?.nextPaymentDate?.toDate() || null,
             updatedAt: statsData?.updatedAt?.toDate() || new Date(),

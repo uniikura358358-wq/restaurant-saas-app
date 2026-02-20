@@ -1,0 +1,92 @@
+/* POP作成ツール専用フォント */
+
+/* 日本語フォント (10種類) */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Noto+Serif+JP:wght@400;700&family=Zen+Maru+Gothic:wght@400;700&family=Kaisei+Tokumin:wght@400;700&family=Dela+Gothic+One&family=Shippori+Mincho:wght@400;700&family=DotGothic16&family=Yuji+Syuku&family=M+PLUS+Rounded+1c:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap');
+
+/* 英語フォント (10種類) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Playfair+Display:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Oswald:wght@400;700&family=Pacifico&family=Caveat:wght@400;700&family=Lobster&family=Bebas+Neue&family=Abril+Fatface&family=Dancing+Script:wght@400;700&display=swap');
+
+/* ユーティリティクラス */
+.font-noto-sans {
+    font-family: 'Noto Sans JP', sans-serif;
+}
+
+.font-noto-serif {
+    font-family: 'Noto Serif JP', serif;
+}
+
+.font-zen-maru {
+    font-family: 'Zen Maru Gothic', sans-serif;
+}
+
+.font-kaisei {
+    font-family: 'Kaisei Tokumin', serif;
+}
+
+.font-dela {
+    font-family: 'Dela Gothic One', cursive;
+}
+
+.font-shippori {
+    font-family: 'Shippori Mincho', serif;
+}
+
+.font-dot {
+    font-family: 'DotGothic16', sans-serif;
+}
+
+.font-yuji {
+    font-family: 'Yuji Syuku', serif;
+}
+
+.font-mplus-round {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+}
+
+.font-zen-kaku {
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+}
+
+.font-meiryo {
+    font-family: 'Meiryo', 'MS PGothic', sans-serif;
+}
+
+.font-inter {
+    font-family: 'Inter', sans-serif;
+}
+
+.font-playfair {
+    font-family: 'Playfair Display', serif;
+}
+
+.font-montserrat {
+    font-family: 'Montserrat', sans-serif;
+}
+
+.font-oswald {
+    font-family: 'Oswald', sans-serif;
+}
+
+.font-pacifico {
+    font-family: 'Pacifico', cursive;
+}
+
+.font-caveat {
+    font-family: 'Caveat', cursive;
+}
+
+.font-lobster {
+    font-family: 'Lobster', cursive;
+}
+
+.font-bebas {
+    font-family: 'Bebas Neue', cursive;
+}
+
+.font-abril {
+    font-family: 'Abril Fatface', cursive;
+}
+
+.font-dancing {
+    font-family: 'Dancing Script', cursive;
+}

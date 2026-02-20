@@ -84,7 +84,7 @@ export default function MaterialsPage() {
                 if (statsData) setStats(statsData);
 
                 if (profileRes.success && profileRes.store) {
-                    const store = profileRes.store;
+                    const store: any = profileRes.store;
                     if (store.storeName) setBasicInfo(prev => ({ ...prev, storeName: store.storeName }));
                     if (store.websiteMaterials) {
                         const wm = store.websiteMaterials;
