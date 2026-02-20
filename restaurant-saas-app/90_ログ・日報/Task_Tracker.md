@@ -243,3 +243,8 @@
   - [x] **HP Materials Update**: 店舗素材管理画面へ英語フィールドの追加とAI一括翻訳ボタンを搭載。
   - [x] **Public Switcher**: 公開サイト用「JP/EN」切り替えスイッチ（グローバル・ガラスモーフィズム）の実装。
   - [x] **Type Safety**: `WebsiteMaterials` インターフェースの多言語対応。
+- [x] **Phase 28: AI Design Concierge (2026-02-21)**
+  - [x] **Conversational UI**: POP作成画面に、AIと対話しながらデザインを追い込める「チャット・コンシェルジュ」を搭載。
+  - [x] **Voice Recognition**: `webkitSpeechRecognition` を活用した音声入力に対応。
+  - [x] **Multimodal In-Chat Upload**: チャット欄からの画像・PDF（テンプレート/商品写真）の追加アップロードとAI解析。
+  - [x] **Context-Aware Design**: ユーザーの要望（「高級感を出して」「写真を左に」等）を汲み取った自動レイアウト更新。

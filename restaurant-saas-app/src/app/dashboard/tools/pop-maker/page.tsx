@@ -28,8 +28,23 @@ import {
     Eraser,
     Type as TypeIcon,
     AArrowUp,
-    AArrowDown
+    AArrowDown,
+    Mic,
+    MicOff,
+    Send,
+    MessageCircle,
+    Paperclip,
+    ArrowRight
 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { chatWithPopAssistant } from "@/app/actions/pop-ai";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,6 +73,15 @@ export default function PopMakerPage() {
     const [fontFamily, setFontFamily] = useState<string>("font-noto-sans");
     const [fontTab, setFontTab] = useState<"jp" | "en">("jp");
     const [fontScale, setFontScale] = useState(100);
+
+    // AI Chat States
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [chatMessages, setChatMessages] = useState<{ role: "user" | "model"; content: string; images?: string[] }[]>([]);
+    const [chatInput, setChatInput] = useState("");
+    const [isListening, setIsListening] = useState(false);
+    const [chatUploadedImages, setChatUploadedImages] = useState<string[]>([]);
+    const chatFileInputRef = useRef<HTMLInputElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
     const [baseFontSize, setBaseFontSize] = useState(16);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([{ name: "", price: "" }]);
     const [currencyUnit, setCurrencyUnit] = useState<CurrencyUnit>("￥");
@@ -318,6 +342,113 @@ export default function PopMakerPage() {
         } finally {
             setGenerating(false);
         }
+    };
+
+    // 音声認識のセットアップ
+    const startListening = () => {
+        if (!('webkitSpeechRecognition' in window)) {
+            toast.error("お使いのブラウザは音声入力に対応していません");
+            return;
+        }
+
+        const recognition = new (window as any).webkitSpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onerror = () => setIsListening(false);
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setChatInput(prev => prev + transcript);
+        };
+
+        recognition.start();
+    };
+
+    // チャットでの画像アップロード
+    const handleChatImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files) {
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setChatUploadedImages(prev => [...prev, reader.result as string]);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    };
+
+    // チャット送信
+    const handleSendChatMessage = async () => {
+        if (!chatInput.trim() && chatUploadedImages.length === 0) return;
+
+        const userMessage = {
+            role: "user" as const,
+            content: chatInput,
+            images: chatUploadedImages
+        };
+
+        const newMessages = [...chatMessages, userMessage];
+        setChatMessages(newMessages);
+        setChatInput("");
+        setChatUploadedImages([]);
+        setGenerating(true);
+
+        try {
+            const result = await chatWithPopAssistant({
+                messages: newMessages,
+                currentPopState: {
+                    productName,
+                    price,
+                    description,
+                    catchphrase,
+                    style,
+                    fontFamily,
+                    menuItems,
+                    aiLayout
+                }
+            });
+
+            if (result.success) {
+                setChatMessages(prev => [...prev, { role: "model", content: result.content }]);
+
+                // JSONが含まれていれば抽出して適用
+                const jsonMatch = result.content.match(/```json\n([\s\S]*?)\n```/) || result.content.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try {
+                        const data = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                        applyAiDesign(data);
+                    } catch (e) {
+                        console.error("Failed to parse design JSON from chat", e);
+                    }
+                }
+            } else {
+                toast.error("AIからの返信に失敗しました");
+            }
+        } catch (error) {
+            toast.error("エラーが発生しました");
+        } finally {
+            setGenerating(false);
+            // スクロールダウン
+            setTimeout(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, 100);
+        }
+    };
+
+    const applyAiDesign = (data: any) => {
+        if (data.productName) setMenuItems([{ name: data.productName, price: data.price || "" }]);
+        if (data.catchphrase) setCatchphrase(data.catchphrase);
+        if (data.description) setDescription(data.description);
+        if (data.style) setStyle(data.style);
+        if (data.fontFamily) setFontFamily(data.fontFamily);
+        if (data.aiLayout) setAiLayout(data.aiLayout);
+        toast.success("AIの提案をデザインに反映しました！");
     };
 
     const handleSuggestFont = async () => {
@@ -1212,14 +1343,149 @@ export default function PopMakerPage() {
                                                 />
                                             </div>
 
-                                            <Button
-                                                onClick={handleAiDesignAssistant}
-                                                disabled={generating}
-                                                className="w-full mt-8 bg-indigo-600 hover:bg-indigo-700 h-16 rounded-2xl text-lg font-black shadow-xl shadow-indigo-100 gap-3 transition-all active:scale-95"
-                                            >
-                                                {generating ? <Loader2 className="size-6 animate-spin" /> : <Wand2 className="size-6" />}
-                                                AIにお助けデザインしてもらう
-                                            </Button>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
+                                                <Button
+                                                    onClick={handleAiDesignAssistant}
+                                                    disabled={generating}
+                                                    className="bg-indigo-600 hover:bg-indigo-700 h-16 rounded-2xl text-lg font-black shadow-xl shadow-indigo-100 gap-3 transition-all active:scale-95"
+                                                >
+                                                    {generating ? <Loader2 className="size-6 animate-spin" /> : <Wand2 className="size-6" />}
+                                                    AIにおまかせ
+                                                </Button>
+
+                                                <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="border-2 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 h-16 rounded-2xl text-lg font-black gap-3 transition-all active:scale-95 text-indigo-700"
+                                                        >
+                                                            <MessageCircle className="size-6" />
+                                                            AIと相談しながら作る
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="sm:max-w-[500px] h-[80vh] flex flex-col p-0 overflow-hidden bg-slate-50 border-none rounded-3xl">
+                                                        <DialogHeader className="p-6 bg-white border-b shrink-0">
+                                                            <DialogTitle className="flex items-center gap-2 text-indigo-600 font-black">
+                                                                <Wand2 className="size-5" />
+                                                                AIデザイン・コンシェルジュ
+                                                            </DialogTitle>
+                                                        </DialogHeader>
+
+                                                        <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+                                                            <div className="space-y-4">
+                                                                {chatMessages.length === 0 && (
+                                                                    <div className="text-center py-10 space-y-4">
+                                                                        <div className="size-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                                                                            <Sparkles className="size-8 text-indigo-600" />
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            <p className="font-black text-slate-800">今日はどんなPOPを作りますか？</p>
+                                                                            <p className="text-xs text-slate-500">「もっと高級感を出して」「写真を左に寄せて」「短いキャッチコピーにして」など、自由にお伝えください。</p>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {chatMessages.map((msg, i) => (
+                                                                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                                                                        <div className={`max-w-[85%] rounded-2xl p-4 text-sm shadow-sm ${msg.role === "user"
+                                                                                ? "bg-indigo-600 text-white rounded-tr-none"
+                                                                                : "bg-white text-slate-800 rounded-tl-none border border-slate-100"
+                                                                            }`}>
+                                                                            {msg.images && msg.images.length > 0 && (
+                                                                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                                                                    {msg.images.map((img, idx) => (
+                                                                                        <img key={idx} src={img} className="rounded-lg w-full h-24 object-cover border border-white/20" />
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                            <p className="whitespace-pre-wrap leading-relaxed">
+                                                                                {msg.content.replace(/```json[\s\S]*?```/, "").trim() || "新しいデザインを提案しました。"}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {generating && (
+                                                                    <div className="flex justify-start">
+                                                                        <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-none p-4 shadow-sm flex items-center gap-2">
+                                                                            <Loader2 className="size-4 animate-spin text-indigo-500" />
+                                                                            <span className="text-xs font-bold text-slate-400">AIが思考中...</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </ScrollArea>
+
+                                                        <div className="p-4 bg-white border-t shrink-0">
+                                                            {chatUploadedImages.length > 0 && (
+                                                                <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+                                                                    {chatUploadedImages.map((img, i) => (
+                                                                        <div key={i} className="relative shrink-0">
+                                                                            <img src={img} className="size-16 rounded-xl object-cover border-2 border-indigo-100 shadow-sm" />
+                                                                            <button
+                                                                                onClick={() => setChatUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
+                                                                                className="absolute -top-1 -right-1 bg-slate-900 text-white rounded-full size-5 flex items-center justify-center text-[10px]"
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-end gap-2">
+                                                                <div className="flex-1 bg-slate-100 rounded-2xl p-2 focus-within:ring-2 ring-indigo-500/20 transition-all">
+                                                                    <textarea
+                                                                        value={chatInput}
+                                                                        onChange={e => setChatInput(e.target.value)}
+                                                                        onKeyDown={e => {
+                                                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                                                e.preventDefault();
+                                                                                handleSendChatMessage();
+                                                                            }
+                                                                        }}
+                                                                        placeholder="どうしたいか教えてください..."
+                                                                        className="w-full bg-transparent border-none focus:ring-0 text-sm p-2 resize-none h-10 max-h-32"
+                                                                    />
+                                                                    <div className="flex items-center justify-between px-1 pt-1 border-t border-slate-200/50 mt-1">
+                                                                        <div className="flex gap-1">
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="size-8 rounded-full text-slate-400 hover:text-indigo-600 hover:bg-white"
+                                                                                onClick={() => chatFileInputRef.current?.click()}
+                                                                            >
+                                                                                <Paperclip className="size-4" />
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className={`size-8 rounded-full ${isListening ? "bg-red-50 text-red-500" : "text-slate-400 hover:text-indigo-600 hover:bg-white"}`}
+                                                                                onClick={startListening}
+                                                                            >
+                                                                                {isListening ? <Mic className="size-4 animate-pulse" /> : <Mic className="size-4" />}
+                                                                            </Button>
+                                                                        </div>
+                                                                        <input
+                                                                            type="file"
+                                                                            ref={chatFileInputRef}
+                                                                            className="hidden"
+                                                                            multiple
+                                                                            accept="image/*"
+                                                                            onChange={handleChatImageUpload}
+                                                                        />
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className="bg-indigo-600 hover:bg-indigo-700 h-8 rounded-xl px-4 font-black gap-2 transition-all active:scale-95"
+                                                                            onClick={handleSendChatMessage}
+                                                                            disabled={generating || (!chatInput.trim() && chatUploadedImages.length === 0)}
+                                                                        >
+                                                                            送信 <Send className="size-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </div>
                                         </div>
                                     </div>
                                 </Card >
