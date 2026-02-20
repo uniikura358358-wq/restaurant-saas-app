@@ -15,7 +15,10 @@ import { Upload, CheckCircle2, AlertCircle, Loader2, Sparkles, Plus, Trash2, Cal
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { saveStoreSettings, getUserProfile } from "@/app/actions/settings";
+import { translateToEnglish } from "@/app/actions/tools";
 import { AppSidebar } from "@/components/app-sidebar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Globe } from "lucide-react";
 
 export default function MaterialsPage() {
     const { user, getToken, loading: authLoading } = useAuth();
@@ -24,7 +27,10 @@ export default function MaterialsPage() {
     const [stats, setStats] = useState<any>(null);
     const [useGoogleData, setUseGoogleData] = useState(true);
     const [catchCopy, setCatchCopy] = useState("こだわりの自家製麺と、秘伝のスープをお楽しみください。");
+    const [catchCopyEn, setCatchCopyEn] = useState("");
     const [isAdjusting, setIsAdjusting] = useState(false);
+    const [isTranslating, setIsTranslating] = useState(false);
+    const [editLang, setEditLang] = useState<"ja" | "en">("ja");
 
     // AI利用状況
     const [aiUsageCount, setAiUsageCount] = useState(0);
@@ -33,6 +39,7 @@ export default function MaterialsPage() {
 
     // 基本情報（Firestore StoreDataとマッピング）
     const [basicInfo, setBasicInfo] = useState({ storeName: '', phone: '', address: '', hours: '' });
+    const [basicInfoEn, setBasicInfoEn] = useState({ storeName: '', address: '', hours: '' });
 
     // 画像情報（現在はURL文字列として管理）
     const [images, setImages] = useState({ interior: '', menu1: '', menu2: '', menu3: '' }); // menu1-3 for products
@@ -95,6 +102,12 @@ export default function MaterialsPage() {
 
                         if (wm.images) setImages(prev => ({ ...prev, ...wm.images }));
                         if (wm.menus) setScheduledMenus(wm.menus || []);
+
+                        // English Data
+                        if (wm.catchCopyEn) setCatchCopyEn(wm.catchCopyEn);
+                        if (wm.storeNameEn) setBasicInfoEn(prev => ({ ...prev, storeName: wm.storeNameEn }));
+                        if (wm.addressEn) setBasicInfoEn(prev => ({ ...prev, address: wm.addressEn }));
+                        if (wm.businessHoursEn) setBasicInfoEn(prev => ({ ...prev, hours: wm.businessHoursEn }));
                     }
                 }
             } catch (err) {
@@ -109,31 +122,29 @@ export default function MaterialsPage() {
     }, [user, authLoading, getToken]);
 
 
-    const handleAIAdjustment = async () => {
-        // 利用枠チェック（内部管理）
-        if (internalCost >= currentMaxLimit) {
-            const message = isLateInMonth
-                ? "今月のAI利用枠に達しました。来月の更新をお待ちいただくか、追加枠をご検討ください。"
-                : "今月のAI利用目安に達しました。追加オプションで継続してご利用いただけます！";
-            toast.error(message);
-            return;
-        }
-
-        setIsAdjusting(true);
+    const handleTranslateAll = async () => {
+        setIsTranslating(true);
+        const loadingToast = toast.loading("AIが高精度翻訳中...");
         try {
-            // Mock logic for demo
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            const newCopy = catchCopy + "（AI調整済み）"; // Mock logic
+            const [cEn, nEn, aEn] = await Promise.all([
+                translateToEnglish(catchCopy, "catchphrase"),
+                translateToEnglish(basicInfo.storeName, "general"),
+                translateToEnglish(basicInfo.address, "general")
+            ]);
 
-            setCatchCopy(newCopy);
-            setInternalCost(prev => prev + 25);
-            setAiUsageCount(prev => prev + 1);
+            setCatchCopyEn(cEn);
+            setBasicInfoEn({
+                storeName: nEn,
+                address: aEn,
+                hours: basicInfoEn.hours // 時間はそのままか手動
+            });
 
-            toast.success("AIがキャッチコピーをより魅力的に修正しました！");
+            toast.success("AIが高精度の英語を作成しました！「英語」タブで確認・微調整できます。", { id: loadingToast });
+            setEditLang("en");
         } catch (error) {
-            toast.error("AI調整に失敗しました。時間をおいて再試行してください。");
+            toast.error("翻訳に失敗しました。", { id: loadingToast });
         } finally {
-            setIsAdjusting(false);
+            setIsTranslating(false);
         }
     };
 
@@ -155,6 +166,11 @@ export default function MaterialsPage() {
                     address: basicInfo.address,
                     phone: basicInfo.phone,
                     businessHours: basicInfo.hours,
+                    // English Data
+                    catchCopyEn,
+                    storeNameEn: basicInfoEn.storeName,
+                    addressEn: basicInfoEn.address,
+                    businessHoursEn: basicInfoEn.hours,
                     images: {
                         interior: images.interior,
                         menu1: images.menu1,
@@ -305,32 +321,63 @@ export default function MaterialsPage() {
                                 </div>
 
                                 {!useGoogleData && (
-                                    <div className="grid gap-4 mt-4 pl-4 border-l-2 border-gray-200">
-                                        <div className="grid gap-2">
-                                            <Label>店舗名</Label>
-                                            <Input
-                                                placeholder="例: 銀座ラーメン 太郎"
-                                                value={basicInfo.storeName}
-                                                onChange={(e) => setBasicInfo({ ...basicInfo, storeName: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label>住所</Label>
-                                            <Input
-                                                placeholder="〒104-0061 東京都中央区銀座..."
-                                                value={basicInfo.address}
-                                                onChange={(e) => setBasicInfo({ ...basicInfo, address: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label>電話番号</Label>
-                                            <Input
-                                                placeholder="03-1234-5678"
-                                                value={basicInfo.phone}
-                                                onChange={(e) => setBasicInfo({ ...basicInfo, phone: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
+                                    <Tabs value={editLang} onValueChange={(v: any) => setEditLang(v)} className="w-full mt-4">
+                                        <TabsList className="grid w-full grid-cols-2 mb-4">
+                                            <TabsTrigger value="ja">日本語表示</TabsTrigger>
+                                            <TabsTrigger value="en" className="gap-2">
+                                                <Globe className="size-3" /> 英語表示 (インバウンド対応)
+                                            </TabsTrigger>
+                                        </TabsList>
+
+                                        <TabsContent value="ja" className="grid gap-4 pl-4 border-l-2 border-slate-200">
+                                            <div className="grid gap-2">
+                                                <Label>店舗名</Label>
+                                                <Input
+                                                    placeholder="例: 銀座ラーメン 太郎"
+                                                    value={basicInfo.storeName}
+                                                    onChange={(e) => setBasicInfo({ ...basicInfo, storeName: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label>住所</Label>
+                                                <Input
+                                                    placeholder="〒104-0061 東京都中央区銀座..."
+                                                    value={basicInfo.address}
+                                                    onChange={(e) => setBasicInfo({ ...basicInfo, address: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label>電話番号</Label>
+                                                <Input
+                                                    placeholder="03-1234-5678"
+                                                    value={basicInfo.phone}
+                                                    onChange={(e) => setBasicInfo({ ...basicInfo, phone: e.target.value })}
+                                                />
+                                            </div>
+                                        </TabsContent>
+
+                                        <TabsContent value="en" className="grid gap-4 pl-4 border-l-2 border-indigo-200">
+                                            <div className="grid gap-2">
+                                                <Label className="flex justify-between">店舗名 (English)</Label>
+                                                <Input
+                                                    placeholder="Example: Ginza Ramen Taro"
+                                                    value={basicInfoEn.storeName}
+                                                    onChange={(e) => setBasicInfoEn({ ...basicInfoEn, storeName: e.target.value })}
+                                                    className="border-indigo-100 focus:border-indigo-400"
+                                                />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label>住所 (English)</Label>
+                                                <Input
+                                                    placeholder="Ginza, Chuo-ku, Tokyo..."
+                                                    value={basicInfoEn.address}
+                                                    onChange={(e) => setBasicInfoEn({ ...basicInfoEn, address: e.target.value })}
+                                                    className="border-indigo-100 focus:border-indigo-400"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">※電話番号は共通で使用されます。</p>
+                                        </TabsContent>
+                                    </Tabs>
                                 )}
                             </CardContent>
                         </Card>
@@ -448,29 +495,58 @@ export default function MaterialsPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-6 space-y-4">
-                                <Textarea
-                                    className="min-h-[120px] text-lg"
-                                    value={catchCopy}
-                                    onChange={(e) => setCatchCopy(e.target.value)}
-                                />
-                                <div className="flex justify-end">
+                                <Tabs value={editLang} onValueChange={(v: any) => setEditLang(v)}>
+                                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                                        <TabsTrigger value="ja">日本語</TabsTrigger>
+                                        <TabsTrigger value="en">英語 (高精度翻訳)</TabsTrigger>
+                                    </TabsList>
+
+                                    <TabsContent value="ja">
+                                        <Textarea
+                                            className="min-h-[120px] text-lg lg:text-xl font-bold border-slate-200"
+                                            value={catchCopy}
+                                            onChange={(e) => setCatchCopy(e.target.value)}
+                                            placeholder="例: こだわりの自家製麺と、秘伝のスープをお楽しみください。"
+                                        />
+                                    </TabsContent>
+
+                                    <TabsContent value="en">
+                                        <Textarea
+                                            className="min-h-[120px] text-lg lg:text-xl font-bold border-indigo-200 bg-indigo-50/10 italic"
+                                            value={catchCopyEn}
+                                            onChange={(e) => setCatchCopyEn(e.target.value)}
+                                            placeholder="High precision AI translation will appear here..."
+                                        />
+                                    </TabsContent>
+                                </Tabs>
+
+                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                                     <Button
                                         variant="outline"
-                                        className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                        className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold"
+                                        onClick={handleTranslateAll}
+                                        disabled={isTranslating || !catchCopy}
+                                    >
+                                        {isTranslating ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        ) : (
+                                            <Globe className="size-4 text-indigo-500" />
+                                        )}
+                                        AIでまるごと英語サイト化
+                                    </Button>
+
+                                    <Button
+                                        variant="outline"
+                                        className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-bold"
                                         onClick={handleAIAdjustment}
                                         disabled={isAdjusting}
                                     >
                                         {isAdjusting ? (
-                                            <>
-                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                AIが魅力を引き出し中...
-                                            </>
+                                            <Loader2 className="size-4 animate-spin" />
                                         ) : (
-                                            <>
-                                                <Sparkles className="mr-2 h-4 w-4 text-indigo-500" />
-                                                AIでより魅力的にする
-                                            </>
+                                            <Sparkles className="size-4 text-orange-400" />
                                         )}
+                                        日本語をAIで磨く
                                     </Button>
                                 </div>
                                 <p className="text-xs text-gray-400 text-center mt-2 font-medium">

@@ -232,3 +232,14 @@
   - クイックチップ（人気6種）+ カテゴリー別グリッドUI
   - FONT_FAMILY_MAP導入（フォントID→CSS font-family値の正確な変換）
   - 旧セクション4「文字のフォント」をAI提案カードに統合
+- [x] **Phase 26: AI Layout Analysis & POP Maker Final Cleanup (2026-02-21)**
+  - [x] **AI Detection**: Gemini Visionを用いたテンプレート内商品枠の自動検出APIを実装。
+  - [x] **Storage Cleanup**: Firebase Storage内の古いテンプレート画像（41枚）を一括削除し管理を効率化。
+  - [x] **Font Expansion**: 居酒屋風の力強い筆文字 (Yuji Boku) やインパクトフォント (Reggae One) 等を6種追加（計27種類）。
+  - [x] **UI Polish**: プレビュー上の「元に戻す」ボタン削除、不要なレイアウト設定コードの整理。
+  - [x] **Git Commit**: 変更内容をリポジトリに保存。
+- [x] **Phase 27: Multilingual Website Support (2026-02-21)**
+  - [x] **AI Translation**: 飲食店・おもてなしに特化した「高精度AI翻訳（Gemini 3 Pro）」の実装。
+  - [x] **HP Materials Update**: 店舗素材管理画面へ英語フィールドの追加とAI一括翻訳ボタンを搭載。
+  - [x] **Public Switcher**: 公開サイト用「JP/EN」切り替えスイッチ（グローバル・ガラスモーフィズム）の実装。
+  - [x] **Type Safety**: `WebsiteMaterials` インターフェースの多言語対応。

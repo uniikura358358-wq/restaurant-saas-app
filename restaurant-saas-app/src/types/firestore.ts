@@ -109,10 +109,14 @@ export interface UserProfile {
  */
 export interface WebsiteMaterials {
     catchCopy: string;
+    catchCopyEn?: string; // High-precision AI translation
     storeName?: string;
+    storeNameEn?: string;
     address?: string;
+    addressEn?: string;
     phone?: string;
     businessHours?: string;
+    businessHoursEn?: string;
     // Images are stored as URLs (or empty strings for now)
     images: {
         interior?: string;

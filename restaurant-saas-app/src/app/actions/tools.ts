@@ -223,5 +223,63 @@ export async function suggestFontFromImage(imageBase64: string) {
     const validFonts = ["font-noto-serif", "font-noto-sans", "font-yuji", "font-inter", "font-playfair", "font-bebas"];
     const matched = validFonts.find(f => responseText.includes(f));
 
-    return matched || "font-noto-sans";
+    return matched || "font-notosans";
+}
+
+/**
+ * 高精度AI翻訳 (飲食店・おもてなし・美食に特化)
+ */
+export async function translateToEnglish(text: string, context: string = "general") {
+    if (!text) return "";
+
+    const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
+    let responseText: string | null = null;
+    let lastError: any = null;
+
+    // 文脈に応じたプロンプト調整
+    let contextNote = "";
+    if (context === "catchphrase") {
+        contextNote = "これは店舗のキャッチコピーです。単なる直訳ではなく、海外の高級レストランやグルメ誌のような、読んだだけで食欲をそそる（Appetizing）で格式高い表現にしてください。";
+    } else if (context === "menu") {
+        contextNote = "これはメニュー項目です。食材の魅力が伝わる自然な英語にしてください。";
+    }
+
+    const prompt = `
+あなたは世界的に評価される美食ガイド（ミシュランや50 Best Restaurants等）の専属エディターであり、プロの翻訳家です。
+以下の日本語を、海外の美食家や観光客が魅了されるような「最高精度の英語」に翻訳してください。
+
+【制約事項】
+- 直訳は厳禁です。英語圏の高級飲食店で実際に使われる、洗練された語彙（Sophisticated vocabulary）を使用してください。
+- 文脈を読み取り、おもてなしの心（Hospitality）が伝わるトーンにしてください。
+- ${contextNote}
+
+【翻訳対象】
+${text}
+
+出力は「翻訳後の英語テキストのみ」を返してください。解説や引用符などは一切不要です。
+`;
+
+    for (const modelName of targetModels) {
+        try {
+            const model = getGenerativeModel(modelName);
+            const generationConfig: any = {};
+            if (modelName === AI_POLICY.PRIMARY) {
+                Object.assign(generationConfig, AI_POLICY.THINKING_CONFIG_LOW);
+            }
+
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig
+            });
+
+            const response = (result as any).response;
+            responseText = response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+            if (responseText) break;
+        } catch (error: any) {
+            console.warn(`TRANSLATION error for ${modelName}:`, error.message);
+            lastError = error;
+        }
+    }
+
+    return responseText || text; // 失敗時は原文を返す
 }
