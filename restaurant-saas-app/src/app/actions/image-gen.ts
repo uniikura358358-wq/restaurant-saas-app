@@ -21,9 +21,9 @@ export async function generateImageWithNanoBanana(prompt: string) {
         });
 
         const response = (result as any).response;
-        // 注意: 実際のSDKの戻り値形式は環境やバージョンにより異なる可能性があります。
-        // 一般的には Base64 形式などで画像データが含まれます。
-        const base64Data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        // 全てのパーツを走査して画像データ（inlineData）を抽出
+        const imagePart = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+        const base64Data = imagePart?.inlineData?.data;
 
         if (!base64Data) {
             throw new Error("画像データの生成に失敗しました（データが空です）。");

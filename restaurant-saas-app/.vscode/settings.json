@@ -4,5 +4,47 @@
         "Supabase",
         "insta",
         "Instagram"
-    ]
+    ],
+    // 1. ファイル監視の除外 (CPU負荷の低減)
+    "files.watcherExclude": {
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+        "**/.next/**": true,
+        "**/.nuxt/**": true,
+        "**/.turbo/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.cache/**": true,
+        "**/coverage/**": true,
+        "**/tmp/**": true,
+        "**/logs/**": true
+    },
+    // 2. 検索対象からの除外 (検索スピードの向上)
+    "search.exclude": {
+        "**/node_modules/**": true,
+        "**/.next/**": true,
+        "**/.nuxt/**": true,
+        "**/.turbo/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.cache/**": true,
+        "**/coverage/**": true,
+        "**/tmp/**": true,
+        "**/logs/**": true
+    },
+    // 3. エクスプローラー表示からの除外 (視認性の向上)
+    "files.exclude": {
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+        "**/.next/**": true,
+        "**/.nuxt/**": true,
+        "**/.turbo/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.cache/**": true,
+        "**/coverage/**": true,
+        "**/tmp/**": true,
+        "**/logs/**": true,
+        "**/tsconfig.tsbuildinfo": true
+    }
 }

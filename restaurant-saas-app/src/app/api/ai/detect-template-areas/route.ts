@@ -51,19 +51,25 @@ export async function POST(req: NextRequest) {
             contents: [{ role: 'user', parts }]
         });
 
-        const response = await result.response;
         let text = "";
         try {
-            text = response.text();
+            // Vertex AI SDKのレスポンス構造に合わせる
+            const resultText = result.response.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (resultText) {
+                text = resultText;
+            } else {
+                throw new Error("AIからのテキスト応答が空です");
+            }
             console.log('AI Raw Response:', text);
         } catch (e) {
             console.error('Failed to get response text:', e);
-            const candidates = (response as any).candidates;
+            // フォールバック
+            const candidates = (result.response as any).candidates;
             if (candidates && candidates[0]?.content?.parts[0]?.text) {
                 text = candidates[0].content.parts[0].text;
-                console.log('AI Raw Response (from candidates):', text);
+                console.log('AI Raw Response (from fallback):', text);
             } else {
-                console.error('Full AI Response Object:', JSON.stringify(response, null, 2));
+                console.error('Full AI Response Object:', JSON.stringify(result.response, null, 2));
                 throw new Error("AIからの応答を取得できませんでした");
             }
         }

@@ -1,5 +1,27 @@
 # Firebase Unification Tasks (Final Plan)
 
+## ✅ 2026-02-21 POP Maker 型不全の解消・品質向上 [DONE]
+
+- [x] `src/types/pop-maker.ts` の新設と型定義の外部化
+- [x] `pop-maker/page.tsx` および `pop-ai.ts` の `any` 型を排除、厳格な型定義を導入
+- [x] `detect-template-areas` API における Vertex AI SDK の型・非同期エラーを修正
+- [x] `ginza-ramen/page.tsx` の重複定義（定数・コンポーネント）を削除し正常化
+- [x] `npm run build` および `tsc` チェックをパスすることを確認
+
+## ✅ 2026-02-21 ゾーン型レイアウト＆バウンディングボックス実装 [DONE]
+
+- [x] `analyze-layout/route.ts` プロンプトを**ゾーン型+バウンディングボックス**に全面刷新
+  - `productBoundingBox: { top, left, bottom, right }` — 写真が占めるエリアをAIが出力
+  - テキスト要素は `zone: "top"|"bottom"|"left"|"right"|"overlay-top"|"overlay-bottom"` で指定
+  - `fontSize` を1〜5のスケール値に正規化（旧：生ピクセル値で巨大化していた）
+- [x] `pop-maker/page.tsx` に `getZoneStyle()` ヘルパー関数を実装
+  - バウンディングボックス参照で写真エリアを完全に回避
+  - 手動ドラッグ位置を最優先、なければゾーンから自動計算
+  - `max-width: 88%` を全テキスト要素に強制（端からのはみ出し防止）
+- [x] catchphrase / productName / price / description 全要素をゾーン型レンダリングに移行
+- [x] 既存レガシー座標（x/y直接指定）へのフォールバック機能も維持
+- [x] `pdfjsWorker` 未使用変数を削除しTSCエラーを解消
+
 - [x] 動作確認・検証
   - [x] 認証エラーの有無確認 (ビルド通過・静的解析)
   - [x] 応答生成の確認 (コード整合性確認)
@@ -248,3 +270,12 @@
   - [x] **Voice Recognition**: `webkitSpeechRecognition` を活用した音声入力に対応。
   - [x] **Multimodal In-Chat Upload**: チャット欄からの画像・PDF（テンプレート/商品写真）の追加アップロードとAI解析。
   - [x] **Context-Aware Design**: ユーザーの要望（「高級感を出して」「写真を左に」等）を汲み取った自動レイアウト更新。
+- [x] **Phase 29: User Experience & Onboarding (2026-02-21)**
+  - [x] **Interactive Guide**: POP作成ツールの詳細な機能説明（ステップガイド）をモーダル形式で実装。
+  - [x] **Help UI**: デザイン作成タブに「使い方ガイド」ボタンを設置し、初心者でも迷わず操作できる環境を整備。
+- [x] **Phase 30: Nano Banana Integration & Design Sense Upgrade (2026-02-21)** `[x]`
+  - [x] **Nano Banana Background Generation**: 全プラン共通で、AI提案時にナノバナナ（Gemini 2.5 Flash Image）による専用背景画像を自動生成。お店に出せる高品質な土台を担保。
+  - [x] **Plan Differentiation**: スタンダードは「プロ品質」、Pro以上は「感動・マニュアル品質（ミシュラン級）」の画風をナノバナナに指示。
+  - [x] **Premium Design Atoms**: ドロップシャドウ、縁取り(stroke)、磨りガラス背景(glass)、装飾レイヤー対応。
+  - [x] **Robust JSON Parsing**: AI応答からのデータ抽出を正規表現で堅牢化。
+  - [x] **Knowledge Sync**: `AI_SPECIFICATIONS.md` にナノバナナによる自動生成ワークフローを追記。

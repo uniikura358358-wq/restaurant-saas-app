@@ -34,7 +34,8 @@ import {
     Send,
     MessageCircle,
     Paperclip,
-    ArrowRight
+    ArrowRight,
+    Zap
 } from "lucide-react";
 import {
     Dialog,
@@ -57,9 +58,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { generatePopCopy, generateReviewCopy, suggestFontFromImage } from "@/app/actions/tools";
 import { QRCodeCanvas } from "qrcode.react";
 
-type PopCategory = "japanese" | "western" | "others";
-type MenuItem = { name: string; price: string };
-type CurrencyUnit = "円" | "￥" | "$";
+import { MenuItem, PopLayout, ManualPosition, PopState, FavoritePop, ChatMessage, CurrencyUnit, PopCategory } from "@/types/pop-maker";
 
 export default function PopMakerPage() {
     const { user, loading: authLoading } = useAuth();
@@ -76,12 +75,24 @@ export default function PopMakerPage() {
 
     // AI Chat States
     const [isChatOpen, setIsChatOpen] = useState(false);
-    const [chatMessages, setChatMessages] = useState<{ role: "user" | "model"; content: string; images?: string[] }[]>([]);
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [isListening, setIsListening] = useState(false);
     const [chatUploadedImages, setChatUploadedImages] = useState<string[]>([]);
     const chatFileInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [isFirstVisit, setIsFirstVisit] = useState(true);
+    const [isWizardMode, setIsWizardMode] = useState(false);
+    const [wizardStep, setWizardStep] = useState(0); // 0:なし, 1:商品写真, 2:テンプレート, 3:基本情報案内
+    const [wizardCompleted, setWizardCompleted] = useState(false);
+    const [promisedProductImage, setPromisedProductImage] = useState(false);
+    const [promisedBgTemplate, setPromisedBgTemplate] = useState(false);
+    const [wizardPurpose, setWizardPurpose] = useState<"menu" | "info">("menu");
+    const [promisedItemCount, setPromisedItemCount] = useState(1);
+    const [wizardStyle, setWizardStyle] = useState<"washoku" | "pop" | "modern">("modern");
+    const [isTextOnly, setIsTextOnly] = useState(false);
+    const [promisedAiImageCount, setPromisedAiImageCount] = useState(0);
+    const [isGuideOpen, setIsGuideOpen] = useState(false);
     const [baseFontSize, setBaseFontSize] = useState(16);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([{ name: "", price: "" }]);
     const [currencyUnit, setCurrencyUnit] = useState<CurrencyUnit>("￥");
@@ -115,7 +126,7 @@ export default function PopMakerPage() {
         setMenuItems(prev => prev.filter((_, i) => i !== index));
     };
     const updateMenuItem = (index: number, field: keyof MenuItem, value: string) => {
-        setMenuItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+        setMenuItems((prev: MenuItem[]) => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
     };
 
     // AI Output States
@@ -125,20 +136,9 @@ export default function PopMakerPage() {
     // V2 New States
     const [productImage, setProductImage] = useState<string | null>(null);
     const [backgroundCustomImage, setBackgroundCustomImage] = useState<string | null>(null);
-    const [favorites, setFavorites] = useState<any[]>([]);
+    const [favorites, setFavorites] = useState<FavoritePop[]>([]);
     const [activeTab, setActiveTab] = useState<"create" | "favorites">("create");
-    const [aiLayout, setAiLayout] = useState<{
-        styleType: string;
-        recommendedColor: string;
-        recommendedBgColor?: string;
-        productLayout?: { x: number; y: number; scale: number; zIndex?: number };
-        layout: {
-            [key: string]: { x: number; y: number; fontSize: number; align: "left" | "center" | "right" };
-        };
-        suggestedFontId?: string;
-        photoAreas?: { x: number; y: number; scale: number; zIndex?: number }[];
-        detectedStyle?: string;
-    } | null>(null);
+    const [aiLayout, setAiLayout] = useState<PopLayout | null>(null);
 
     // AIテンプレート解析実行
     const handleAnalyzeTemplate = async (bgImage: string) => {
@@ -159,14 +159,14 @@ export default function PopMakerPage() {
             const data = await response.json();
 
             if (data && data.photoAreas) {
-                setAiLayout(prev => ({
+                setAiLayout((prev) => ({
                     ...prev,
                     photoAreas: data.photoAreas,
                     detectedStyle: data.detectedStyle,
                     styleType: data.detectedStyle || prev?.styleType || 'modern',
                     recommendedColor: prev?.recommendedColor || '#000',
                     layout: prev?.layout || {}
-                } as any));
+                } as PopLayout));
                 toast.success(`${data.photoAreas.length}箇所の写真枠を検出しました！`, { id: loadingToast });
             }
         } catch (error: any) {
@@ -179,7 +179,7 @@ export default function PopMakerPage() {
     const [outputSize, setOutputSize] = useState<"a4" | "poster" | "sns">("a4");
     const [externalUrl, setExternalUrl] = useState("");
     const [isImporting, setIsImporting] = useState(false);
-    const [manualPositions, setManualPositions] = useState<Record<string, { x: number, y: number }>>({});
+    const [manualPositions, setManualPositions] = useState<Record<string, ManualPosition>>({});
     const [verticalText, setVerticalText] = useState<Record<string, boolean>>({});
     const [selectedElement, setSelectedElement] = useState<string | null>(null);
     const [elementScales, setElementScales] = useState<Record<string, number>>({});
@@ -196,9 +196,9 @@ export default function PopMakerPage() {
     const popRef = useRef<HTMLDivElement>(null);
 
     // History for Undo
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<PopState[]>([]);
 
-    const getCurrentState = () => ({
+    const getCurrentState = (): PopState => ({
         menuItems, currencyUnit, itemCategory, features, catchphrase, description,
         productImage, backgroundCustomImage, fontFamily, fontScale, aiLayout,
         manualPositions, verticalText, style, elementScales
@@ -206,16 +206,16 @@ export default function PopMakerPage() {
 
     const pushHistory = () => {
         const currentState = getCurrentState();
-        setHistory(prev => [...prev.slice(-19), currentState]); // Max 20 steps
+        setHistory((prev) => [...prev.slice(-19), currentState]); // Max 20 steps
     };
 
     const handleUndo = () => {
         if (history.length === 0) return;
         const prevState = history[history.length - 1];
-        setHistory(prev => prev.slice(0, -1));
+        setHistory((prev) => prev.slice(0, -1));
 
-        setMenuItems(prevState.menuItems || [{ name: prevState.productName || "", price: prevState.price || "" }]);
-        if (prevState.currencyUnit) setCurrencyUnit(prevState.currencyUnit);
+        setMenuItems(prevState.menuItems);
+        setCurrencyUnit(prevState.currencyUnit);
         setItemCategory(prevState.itemCategory);
         setFeatures(prevState.features);
         setCatchphrase(prevState.catchphrase);
@@ -233,7 +233,7 @@ export default function PopMakerPage() {
 
     const handleElementScaleChange = (id: string, delta: number) => {
         pushHistory();
-        setElementScales(prev => ({
+        setElementScales((prev: Record<string, number>) => ({
             ...prev,
             [id]: Math.max(0.1, (prev[id] || 1.0) + delta)
         }));
@@ -261,36 +261,80 @@ export default function PopMakerPage() {
     };
 
     const handleAiDesignAssistant = async () => {
-        if (!productImage && !productName) {
-            toast.warning("写真アップロードまたは商品名の入力が必要です");
+        const hasProductImage = !!productImage;
+        const hasBgTemplate = !!backgroundCustomImage;
+
+        const currentName = productName || menuItems[0]?.name;
+        const currentPrice = price || menuItems[0]?.price;
+        const currentFeatures = features || description;
+
+        const hasName = !!currentName;
+        const hasPrice = !!currentPrice;
+        const hasFeatures = !!currentFeatures;
+
+        // ウィザード未完了なら開始
+        if (!wizardCompleted) {
+            setPromisedProductImage(false);
+            setPromisedBgTemplate(false);
+            setIsChatOpen(true);
+            setIsWizardMode(true);
+            setWizardStep(1);
+            setChatMessages([
+                {
+                    role: "model",
+                    content: "AIデザイン・コンシェルジュへようこそ！最高の一枚を作るために、いくつか教えてください。\n\nまず、**商品（料理）の写真**はありますか？"
+                }
+            ]);
             return;
         }
 
+        // ウィザード完了後のバリデーションチェック
+        const missingItems: string[] = [];
+        if (!hasName) missingItems.push("商品名");
+        if (!hasPrice) missingItems.push("価格");
+        if (!hasFeatures) missingItems.push("こだわりポイント");
+        if (promisedProductImage && !hasProductImage) missingItems.push("商品写真");
+        if (promisedBgTemplate && !hasBgTemplate) missingItems.push("テンプレート画像");
+
+        if (missingItems.length > 0) {
+            toast.error("AIデザインを実行できません", {
+                description: `${missingItems.join(" と ")} を入力してください`,
+                duration: 5000,
+            });
+            return;
+        }
+
+        // すべて揃っている、または追加素材なしで進行可能な場合に解析を実行
         setGenerating(true);
+
+        // シナリオ判定
+        let aiScenario: 'product-only' | 'template-only' | 'text-only' = 'product-only';
+        if (hasProductImage) aiScenario = 'product-only';
+        else if (hasBgTemplate) aiScenario = 'template-only';
+        else aiScenario = 'text-only';
+
         try {
             const response = await fetch('/api/ai/analyze-layout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    image: productImage,
+                    image: productImage || null,
                     backgroundImage: backgroundCustomImage || null,
-                    productName,
-                    price,
-                    description,
+                    productName: currentName,
+                    price: currentPrice,
+                    description: currentFeatures,
                     catchphrase,
-                    planName: 'pro'
+                    planName: planName || undefined,
+                    aiScenario,
                 })
             });
 
             const data = await response.json();
             if (data.error) throw new Error(data.error);
 
-            setAiLayout(data.layout);
-            if (data.styleType) setCategory(data.styleType as any);
-            if (data.suggestedFontId) setFontFamily(data.suggestedFontId);
-
-            // コピーが空で、AIが何か提案していれば埋める（API側プロンプト要調整だが現時点ではレイアウト重視）
-            toast.success("AIが最適なレイアウトを提案しました！");
+            applyAiDesign(data);
+            // 成功したらリセット (任意だが、再度丸投げしたい場合のためにリセット)
+            // setWizardCompleted(false); 
         } catch (error: any) {
             console.error('AI Design Assistant Error:', error);
             toast.error("AIデザインの提案に失敗しました");
@@ -374,7 +418,7 @@ export default function PopMakerPage() {
             Array.from(files).forEach(file => {
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    setChatUploadedImages(prev => [...prev, reader.result as string]);
+                    setChatUploadedImages((prev: string[]) => [...prev, reader.result as string]);
                 };
                 reader.readAsDataURL(file);
             });
@@ -391,7 +435,7 @@ export default function PopMakerPage() {
             images: chatUploadedImages
         };
 
-        const newMessages = [...chatMessages, userMessage];
+        const newMessages: ChatMessage[] = [...chatMessages, userMessage];
         setChatMessages(newMessages);
         setChatInput("");
         setChatUploadedImages([]);
@@ -400,26 +444,21 @@ export default function PopMakerPage() {
         try {
             const result = await chatWithPopAssistant({
                 messages: newMessages,
-                currentPopState: {
-                    productName,
-                    price,
-                    description,
-                    catchphrase,
-                    style,
-                    fontFamily,
-                    menuItems,
-                    aiLayout
-                }
+                currentPopState: getCurrentState(),
+                planName: planName || undefined
             });
 
             if (result.success) {
-                setChatMessages(prev => [...prev, { role: "model", content: result.content }]);
+                setChatMessages((prev: any[]) => [...prev, { role: "model", content: result.content }]);
 
-                // JSONが含まれていれば抽出して適用
-                const jsonMatch = result.content.match(/```json\n([\s\S]*?)\n```/) || result.content.match(/\{[\s\S]*\}/);
+                // JSONが含まれていれば抽出して適用 (JSONの抽出を堅牢化)
+                const jsonMatch = result.content.match(/```json\s*([\s\S]*?)\s*```/) || result.content.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                     try {
                         const data = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                        if (result.generatedBackground) {
+                            data.generatedBackground = result.generatedBackground;
+                        }
                         applyAiDesign(data);
                     } catch (e) {
                         console.error("Failed to parse design JSON from chat", e);
@@ -429,6 +468,7 @@ export default function PopMakerPage() {
                 toast.error("AIからの返信に失敗しました");
             }
         } catch (error) {
+            console.error("AI chat error", error);
             toast.error("エラーが発生しました");
         } finally {
             setGenerating(false);
@@ -442,12 +482,22 @@ export default function PopMakerPage() {
     };
 
     const applyAiDesign = (data: any) => {
+        pushHistory(); // 変更前に履歴を追加するように修正
         if (data.productName) setMenuItems([{ name: data.productName, price: data.price || "" }]);
         if (data.catchphrase) setCatchphrase(data.catchphrase);
         if (data.description) setDescription(data.description);
         if (data.style) setStyle(data.style);
         if (data.fontFamily) setFontFamily(data.fontFamily);
-        if (data.aiLayout) setAiLayout(data.aiLayout);
+        if (data.generatedBackground) setBackgroundCustomImage(data.generatedBackground);
+
+        // aiLayoutの適用（正規化）
+        const normalizedLayout: PopLayout = data.aiLayout || (data.layout ? { ...data, ...data.layout } : null);
+        if (normalizedLayout) {
+            // 安全策：色が極端な場合に備えた最終ガード
+            if (!normalizedLayout.recommendedColor) normalizedLayout.recommendedColor = "#000000";
+            if (!normalizedLayout.recommendedBgColor) normalizedLayout.recommendedBgColor = "#FFFFFF";
+            setAiLayout(normalizedLayout);
+        }
         toast.success("AIの提案をデザインに反映しました！");
     };
 
@@ -471,7 +521,7 @@ export default function PopMakerPage() {
     };
 
     const toggleVertical = (elementId: string) => {
-        setVerticalText(prev => ({
+        setVerticalText((prev: Record<string, boolean>) => ({
             ...prev,
             [elementId]: !prev[elementId]
         }));
@@ -487,7 +537,7 @@ export default function PopMakerPage() {
         const x = ((info.point.x - rect.left) / rect.width) * 100;
         const y = ((info.point.y - rect.top) / rect.height) * 100;
 
-        setManualPositions(prev => ({
+        setManualPositions((prev: any) => ({
             ...prev,
             [elementId]: { x, y }
         }));
@@ -561,16 +611,10 @@ export default function PopMakerPage() {
     };
 
     const handleAddToFavorite = () => {
-        const newFav = {
+        const currentState = getCurrentState();
+        const newFav: FavoritePop = {
+            ...currentState,
             id: Date.now().toString(),
-            menuItems,
-            productName,
-            price,
-            catchphrase,
-            description,
-            style,
-            fontFamily,
-            productImage,
             timestamp: new Date().toISOString()
         };
         setFavorites([newFav, ...favorites]);
@@ -664,31 +708,167 @@ export default function PopMakerPage() {
         }
 
         const baseClass = `w-full ${aspectClass} rounded-sm shadow-2xl overflow-hidden relative flex flex-col items-center justify-center text-center transition-all duration-500 ${fontFamily}`;
+        // fontSizeスケール（1〜5）→ 実際のpx変換
+        // scale 1=最小(0.5rem相当), 5=最大(3rem相当)
+        const FONT_SCALE_MAP: Record<number, number> = { 1: 0.7, 2: 0.9, 3: 1.2, 4: 1.7, 5: 2.2 };
         const getFontSize = (ratio: number, elementId?: string) => {
             const individualScale = elementId ? elementScales[elementId] || 1.0 : 1.0;
             return `${baseFontSize * ratio * (fontScale / 100) * individualScale}px`;
         };
+        // AI ゾーン型レイアウト: zone名 → CSS座標に変換
+        // productBoundingBox を参照して写真エリアを完全に避ける
+        const getZoneStyle = (
+            zone: string,
+            elementKey: string,
+            align: 'left' | 'center' | 'right' = 'center',
+            fontSize: number = 3,
+            glass: boolean = false
+        ): React.CSSProperties => {
+            const bb = aiLayout?.productBoundingBox;
+            // バウンディングボックスがない場合のデフォルト（写真が中央60%を占める想定）
+            const safeTop = bb ? Math.max(0, bb.top - 2) : 20;
+            const safeBottom = bb ? Math.min(100, bb.bottom + 2) : 80;
+            const safeLeft = bb ? Math.max(0, bb.left - 2) : 15;
+            const safeRight = bb ? Math.min(100, bb.right + 2) : 85;
+
+            const fsPx = `${baseFontSize * (FONT_SCALE_MAP[Math.min(5, Math.max(1, Math.round(fontSize)))] || 1.4) * (fontScale / 100) * (elementScales[elementKey] || 1.0)}px`;
+            const textColor = aiLayout?.recommendedColor || '#000000';
+            const glassBg: React.CSSProperties = glass ? {
+                backgroundColor: 'rgba(0,0,0,0.45)',
+                backdropFilter: 'blur(6px)',
+                padding: '0.3em 0.8em',
+                borderRadius: '0.4em',
+                WebkitBackdropFilter: 'blur(6px)',
+            } : {};
+
+            const manualPos = manualPositions[elementKey];
+            // 手動ドラッグ位置を最優先
+            if (manualPos?.x !== undefined && manualPos?.y !== undefined) {
+                return {
+                    position: 'absolute' as const,
+                    top: `${manualPos.y}%`,
+                    left: `${manualPos.x}%`,
+                    transform: align === 'center' ? 'translate(-50%, -50%)' : 'translate(0, -50%)',
+                    textAlign: align,
+                    maxWidth: '88%',
+                    fontSize: fsPx,
+                    color: textColor,
+                    ...glassBg,
+                };
+            }
+
+            let top: string, left: string, transform: string;
+
+            switch (zone) {
+                case 'top':
+                    // 写真の上方エリア（safeTop% の半分の位置）
+                    top = `${safeTop / 2}%`;
+                    left = align === 'center' ? '50%' : (align === 'right' ? '90%' : '5%');
+                    transform = align === 'center' ? 'translate(-50%, -50%)' : 'translate(0, -50%)';
+                    break;
+                case 'bottom':
+                    // 写真の下方エリア
+                    top = `${safeBottom + (100 - safeBottom) / 2}%`;
+                    left = align === 'center' ? '50%' : (align === 'right' ? '90%' : '5%');
+                    transform = align === 'center' ? 'translate(-50%, -50%)' : 'translate(0, -50%)';
+                    break;
+                case 'left':
+                    // 写真の左側エリア
+                    top = '50%';
+                    left = `${safeLeft / 2}%`;
+                    transform = 'translate(-50%, -50%)';
+                    break;
+                case 'right':
+                    // 写真の右側エリア
+                    top = '50%';
+                    left = `${safeRight + (100 - safeRight) / 2}%`;
+                    transform = 'translate(-50%, -50%)';
+                    break;
+                case 'overlay-top':
+                    // 写真の上部に被せる（glass推奨）
+                    top = `${bb ? bb.top + 5 : 15}%`;
+                    left = '50%';
+                    transform = 'translate(-50%, 0)';
+                    break;
+                case 'overlay-bottom':
+                default:
+                    // 写真の下部に被せる（glass推奨）
+                    top = `${bb ? bb.bottom - 15 : 72}%`;
+                    left = '50%';
+                    transform = 'translate(-50%, 0)';
+                    break;
+            }
+
+            return {
+                position: 'absolute' as const,
+                top,
+                left,
+                transform,
+                textAlign: align,
+                maxWidth: '88%',
+                fontSize: fsPx,
+                color: textColor,
+                ...glassBg,
+            };
+        };
+
+        // プレミアムエフェクト生成ヘルパー
+        const getPremiumStyles = (id: string, base: any) => {
+            const ai = aiLayout?.[id];
+            if (!ai) return base;
+            return {
+                ...base,
+                textShadow: ai.shadow || (ai.style === 'luxury' ? '2px 2px 10px rgba(0,0,0,0.5)' : 'none'),
+                WebkitTextStroke: ai.stroke || 'none',
+                letterSpacing: ai.letterSpacing || 'normal',
+                lineHeight: ai.lineHeight || '1.2',
+                ...(ai.glass && {
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '1rem',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+                })
+            };
+        };
 
         return (
             <div
-                className={`relative w-full ${aspectClass} overflow-hidden bg-white shadow-2xl pop-container`}
+                className={`relative w-full ${aspectClass} overflow-hidden bg-white shadow-2xl pop-container select-none`}
                 style={{ fontFamily: FONT_FAMILY_MAP[fontFamily] || "'Noto Sans JP', sans-serif" }}
             >
                 {/* 背景レイヤー */}
                 <div
-                    className="absolute inset-0 bg-cover bg-center"
+                    className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
                     style={{
                         backgroundImage: `url(${backgroundCustomImage || getPublicStorageUrl(config.bg)})`,
                         backgroundColor: aiLayout?.recommendedBgColor || '#fff'
                     }}
                 />
 
-                {/* 商品写真レイヤー (AI自動配置 or 単一配置) */}
+                {/* 装飾レイヤー (背景と写真の間) */}
+                {aiLayout?.decorations?.filter((d: any) => d.layer === 'back').map((dec: any, i: number) => (
+                    <div
+                        key={`dec-back-${i}`}
+                        className="absolute pointer-events-none"
+                        style={{
+                            top: `${dec.y}%`,
+                            left: `${dec.x}%`,
+                            transform: `translate(-50%, -50%) rotate(${dec.rotate || 0}deg) scale(${dec.scale || 1})`,
+                            zIndex: 2,
+                        }}
+                    >
+                        {dec.type === 'brush' && <div className="w-[300px] h-[60px] opacity-40 bg-current blur-md rounded-full" style={{ color: dec.color || aiLayout.recommendedColor }} />}
+                        {dec.type === 'circle' && <div className="size-20 rounded-full border-4 border-dashed border-current opacity-20" style={{ color: dec.color || aiLayout.recommendedColor }} />}
+                    </div>
+                ))}
+
+                {/* 商品写真レイヤー */}
                 {aiLayout?.photoAreas && aiLayout.photoAreas.length > 0 ? (
-                    // AIで検出された枠に配置
-                    aiLayout.photoAreas.map((area, index) => {
+                    aiLayout.photoAreas.map((area: any, index: number) => {
                         const item = menuItems[index % menuItems.length];
-                        const image = item.image || productImage; // 個別画像がなければ共通画像
+                        const image = item.image || productImage;
                         if (!image) return null;
                         return (
                             <motion.div
@@ -705,12 +885,11 @@ export default function PopMakerPage() {
                                     zIndex: area.zIndex || 5
                                 }}
                             >
-                                <img src={image} alt={`Item ${index + 1}`} className="w-full h-auto object-contain drop-shadow-xl" />
+                                <img src={image} alt={`Item ${index + 1}`} className="w-full h-auto object-contain drop-shadow-2xl filter saturate-[1.1] contrast-[1.05]" />
                             </motion.div>
                         );
                     })
                 ) : (
-                    // 従来通りの単一配置（中央優先）
                     productImage && (
                         <motion.div
                             drag
@@ -725,10 +904,41 @@ export default function PopMakerPage() {
                                 zIndex: aiLayout?.productLayout?.zIndex || 5
                             }}
                         >
-                            <img src={productImage} alt="Product" className="w-full h-auto object-contain drop-shadow-2xl" />
+                            <img src={productImage} alt="Product" className="w-full h-auto object-contain drop-shadow-2xl filter saturate-[1.1]" />
                         </motion.div>
                     )
                 )}
+
+                {/* 前面装飾レイヤー (リボン・バッジ) */}
+                {aiLayout?.decorations?.filter((d: any) => d.layer !== 'back').map((dec: any, i: number) => (
+                    <div
+                        key={`dec-front-${i}`}
+                        className="absolute pointer-events-none z-20"
+                        style={{
+                            top: `${dec.y}%`,
+                            left: `${dec.x}%`,
+                            transform: `translate(-50%, -50%) rotate(${dec.rotate || 0}deg) scale(${dec.scale || 1})`,
+                        }}
+                    >
+                        {dec.type === 'ribbon' && (
+                            <div className="relative px-6 py-2 bg-red-600 text-white font-black text-xs shadow-xl flex items-center justify-center min-w-[120px]">
+                                {dec.text}
+                                <div className="absolute top-0 -left-3 border-t-[16px] border-t-transparent border-b-[16px] border-b-transparent border-r-[12px] border-r-red-800 -z-10" />
+                                <div className="absolute top-0 -right-3 border-t-[16px] border-t-transparent border-b-[16px] border-b-transparent border-l-[12px] border-l-red-800 -z-10" />
+                            </div>
+                        )}
+                        {dec.type === 'seal' && (
+                            <div className="size-16 rounded-full bg-amber-400 border-4 border-white shadow-xl flex items-center justify-center text-center p-2 leading-tight">
+                                <span className="text-[10px] font-black text-amber-900">{dec.text}</span>
+                            </div>
+                        )}
+                        {dec.type === 'badge' && (
+                            <div className="px-3 py-1 bg-slate-900 text-white rounded-full text-[10px] font-black shadow-lg">
+                                {dec.text}
+                            </div>
+                        )}
+                    </div>
+                ))}
 
                 {showTextOverlay === "all" && catchphrase && (config.catchphrase || aiLayout?.catchphrase) && (
                     <motion.div
@@ -737,47 +947,33 @@ export default function PopMakerPage() {
                         onDragEnd={(e, info) => handleDragEnd("catchphrase", e, info)}
                         className="absolute z-10 font-bold cursor-move group h-auto"
                         style={{
-                            ...(aiLayout?.catchphrase ? {
-                                top: manualPositions.catchphrase?.y ? `${manualPositions.catchphrase.y}%` : `${aiLayout.catchphrase.y}%`,
-                                left: manualPositions.catchphrase?.x ? `${manualPositions.catchphrase.x}%` : `${aiLayout.catchphrase.x}%`,
-                                transform: aiLayout.catchphrase.align === 'center' ? 'translateX(-50%)' : 'none',
-                                textAlign: aiLayout.catchphrase.align,
-                                color: aiLayout.recommendedColor || config.catchphrase?.color || '#000'
-                            } : config.catchphrase),
-                            fontSize: getFontSize(1.2 * (aiLayout?.catchphrase?.fontSize / 10 || 1), "catchphrase"),
+                            // ゾーン型 or レガシー座標にフォールバック
+                            ...(aiLayout?.catchphrase?.zone
+                                ? getZoneStyle(aiLayout.catchphrase.zone, 'catchphrase', aiLayout.catchphrase.align, aiLayout.catchphrase.fontSize, aiLayout.catchphrase.glass)
+                                : getPremiumStyles("catchphrase", aiLayout?.catchphrase ? {
+                                    top: manualPositions.catchphrase?.y ? `${manualPositions.catchphrase.y}%` : `${aiLayout.catchphrase.y ?? 10}%`,
+                                    left: manualPositions.catchphrase?.x ? `${manualPositions.catchphrase.x}%` : `${aiLayout.catchphrase.x ?? 50}%`,
+                                    transform: aiLayout.catchphrase.align === 'center' ? 'translateX(-50%)' : 'none',
+                                    textAlign: aiLayout.catchphrase.align || 'center',
+                                    color: aiLayout.recommendedColor || '#000',
+                                    maxWidth: '88%',
+                                    fontSize: getFontSize(1.2, 'catchphrase'),
+                                } : config.catchphrase)),
                             writingMode: verticalText.catchphrase ? 'vertical-rl' : 'horizontal-tb',
-                            textOrientation: verticalText.catchphrase ? 'upright' : 'mixed'
+                            textOrientation: verticalText.catchphrase ? 'upright' : 'mixed',
                         }}
                     >
                         <div className="relative group">
                             {catchphrase}
                             <div className="absolute -top-10 -right-10 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
-                                <Button
-                                    onClick={(e) => { e.stopPropagation(); toggleVertical("catchphrase"); }}
-                                    className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"
-                                    title="縦書き切替"
-                                >
-                                    <TypeIcon className="size-4" />
-                                </Button>
-                                <Button
-                                    onClick={(e) => { e.stopPropagation(); handleElementScaleChange("catchphrase", -0.1); }}
-                                    className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"
-                                    title="縮小"
-                                >
-                                    <Minus className="size-4" />
-                                </Button>
-                                <Button
-                                    onClick={(e) => { e.stopPropagation(); handleElementScaleChange("catchphrase", 0.1); }}
-                                    className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"
-                                    title="拡大"
-                                >
-                                    <Plus className="size-4" />
-                                </Button>
+                                <Button onClick={(e) => { e.stopPropagation(); toggleVertical("catchphrase"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><TypeIcon className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("catchphrase", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><Minus className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("catchphrase", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><Plus className="size-4" /></Button>
                             </div>
                         </div>
                     </motion.div>
                 )}
-                {/* 商品名・価格レイヤー：1商品=従来大きめ / 複数=メニューリスト */}
+
                 {showTextOverlay === "all" && menuItems.length === 1 && productName && (config.productName || aiLayout?.productName) && (
                     <motion.div
                         drag
@@ -785,62 +981,65 @@ export default function PopMakerPage() {
                         onDragEnd={(e, info) => handleDragEnd("productName", e, info)}
                         className="absolute z-10 font-black cursor-move group"
                         style={{
-                            ...(aiLayout?.productName ? {
-                                top: manualPositions.productName?.y ? `${manualPositions.productName.y}%` : `${aiLayout.productName.y}%`,
-                                left: manualPositions.productName?.x ? `${manualPositions.productName.x}%` : `${aiLayout.productName.x}%`,
-                                transform: aiLayout.productName.align === 'center' ? 'translateX(-50%)' : 'none',
-                                textAlign: aiLayout.productName.align,
-                                color: aiLayout.recommendedColor || config.productName?.color || '#000',
-                                width: verticalText.productName ? 'auto' : '80%'
-                            } : config.productName),
-                            fontSize: getFontSize(3.5 * (aiLayout?.productName?.fontSize / 25 || 1), "productName"),
+                            ...(aiLayout?.productName?.zone
+                                ? getZoneStyle(aiLayout.productName.zone, 'productName', aiLayout.productName.align, aiLayout.productName.fontSize, aiLayout.productName.glass)
+                                : getPremiumStyles("productName", aiLayout?.productName ? {
+                                    top: manualPositions.productName?.y ? `${manualPositions.productName.y}%` : `${aiLayout.productName.y ?? 80}%`,
+                                    left: manualPositions.productName?.x ? `${manualPositions.productName.x}%` : `${aiLayout.productName.x ?? 50}%`,
+                                    transform: aiLayout.productName.align === 'center' ? 'translateX(-50%)' : 'none',
+                                    textAlign: aiLayout.productName.align || 'center',
+                                    color: aiLayout.recommendedColor || '#000',
+                                    maxWidth: '88%',
+                                    fontSize: getFontSize(2.0, 'productName'),
+                                } : config.productName)),
                             writingMode: verticalText.productName ? 'vertical-rl' : 'horizontal-tb',
-                            textOrientation: verticalText.productName ? 'upright' : 'mixed'
+                            textOrientation: verticalText.productName ? 'upright' : 'mixed',
                         }}
                     >
-                        <div className="relative group">
+                        <div className="relative group text-balance">
                             {productName}
                             <div className="absolute -top-10 -right-10 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
-                                <Button onClick={(e) => { e.stopPropagation(); toggleVertical("productName"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all" title="縦書き切替"><TypeIcon className="size-4" /></Button>
-                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("productName", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all" title="縮小"><Minus className="size-4" /></Button>
-                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("productName", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all" title="拡大"><Plus className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); toggleVertical("productName"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><TypeIcon className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("productName", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><Minus className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("productName", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><Plus className="size-4" /></Button>
                             </div>
                         </div>
                     </motion.div>
                 )}
-                {
-                    showTextOverlay === "all" && description && (config.description || aiLayout?.description) && (
-                        <motion.div
-                            drag
-                            dragMomentum={false}
-                            onDragEnd={(e, info) => handleDragEnd("description", e, info)}
-                            className="absolute z-10 leading-relaxed font-medium cursor-move group"
-                            style={{
-                                ...(aiLayout?.description ? {
-                                    top: manualPositions.description?.y ? `${manualPositions.description.y}%` : `${aiLayout.description.y}%`,
-                                    left: manualPositions.description?.x ? `${manualPositions.description.x}%` : `${aiLayout.description.x}%`,
+
+                {showTextOverlay === "all" && description && (config.description || aiLayout?.description) && (
+                    <motion.div
+                        drag
+                        dragMomentum={false}
+                        onDragEnd={(e, info) => handleDragEnd("description", e, info)}
+                        className="absolute z-10 leading-relaxed font-medium cursor-move group"
+                        style={{
+                            ...(aiLayout?.description?.zone
+                                ? getZoneStyle(aiLayout.description.zone, 'description', aiLayout.description.align, aiLayout.description.fontSize, aiLayout.description.glass)
+                                : getPremiumStyles("description", aiLayout?.description ? {
+                                    top: manualPositions.description?.y ? `${manualPositions.description.y}%` : `${aiLayout.description.y ?? 85}%`,
+                                    left: manualPositions.description?.x ? `${manualPositions.description.x}%` : `${aiLayout.description.x ?? 50}%`,
                                     transform: aiLayout.description.align === 'center' ? 'translateX(-50%)' : 'none',
-                                    textAlign: aiLayout.description.align,
-                                    color: aiLayout.recommendedColor || config.description?.color || '#333',
-                                    width: verticalText.description ? 'auto' : '75%'
-                                } : config.description),
-                                fontSize: getFontSize(1.0 * (aiLayout?.description?.fontSize / 12 || 1), "description"),
-                                writingMode: verticalText.description ? 'vertical-rl' : 'horizontal-tb',
-                                textOrientation: verticalText.description ? 'upright' : 'mixed'
-                            }}
-                        >
-                            <div className="relative group">
-                                {description}
-                                <div className="absolute -top-8 -right-8 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
-                                    <Button onClick={(e) => { e.stopPropagation(); toggleVertical("description"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-1.5 text-slate-500 hover:text-indigo-600 size-7" title="縦書き切替"><TypeIcon className="size-3" /></Button>
-                                    <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("description", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-1.5 text-slate-500 hover:text-indigo-600 size-7" title="縮小"><Minus className="size-3" /></Button>
-                                    <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("description", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-1.5 text-slate-500 hover:text-indigo-600 size-7" title="拡大"><Plus className="size-3" /></Button>
-                                </div>
+                                    textAlign: aiLayout.description.align || 'center',
+                                    color: aiLayout.recommendedColor || '#333',
+                                    maxWidth: '88%',
+                                    fontSize: getFontSize(0.8, 'description'),
+                                } : config.description)),
+                            writingMode: verticalText.description ? 'vertical-rl' : 'horizontal-tb',
+                            textOrientation: verticalText.description ? 'upright' : 'mixed',
+                        }}
+                    >
+                        <div className="relative group">
+                            {description}
+                            <div className="absolute -top-8 -right-8 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
+                                <Button onClick={(e) => { e.stopPropagation(); toggleVertical("description"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-1.5 text-slate-500 hover:text-indigo-600 size-7"><TypeIcon className="size-3" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("description", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-1.5 text-slate-500 hover:text-indigo-600 size-7"><Minus className="size-3" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("description", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-1.5 text-slate-500 hover:text-indigo-600 size-7"><Plus className="size-3" /></Button>
                             </div>
-                        </motion.div>
-                    )
-                }
-                {/* 1商品時の価格表示 */}
+                        </div>
+                    </motion.div>
+                )}
+
                 {showTextOverlay !== "none" && menuItems.length === 1 && price && (config.price || aiLayout?.price) && (
                     <motion.div
                         drag
@@ -848,83 +1047,83 @@ export default function PopMakerPage() {
                         onDragEnd={(e, info) => handleDragEnd("price", e, info)}
                         className="absolute z-10 font-black cursor-move group"
                         style={{
-                            ...(aiLayout?.price ? {
-                                top: manualPositions.price?.y ? `${manualPositions.price.y}%` : `${aiLayout.price.y}%`,
-                                left: manualPositions.price?.x ? `${manualPositions.price.x}%` : `${aiLayout.price.x}%`,
-                                transform: aiLayout.price.align === 'center' ? 'translateX(-50%)' : 'none',
-                                textAlign: aiLayout.price.align,
-                                color: aiLayout.recommendedColor || config.price?.color || '#b45309'
-                            } : config.price),
-                            fontSize: getFontSize(2.8 * (aiLayout?.price?.fontSize / 20 || 1), "price"),
+                            ...(aiLayout?.price?.zone
+                                ? getZoneStyle(aiLayout.price.zone, 'price', aiLayout.price.align, aiLayout.price.fontSize, aiLayout.price.glass)
+                                : getPremiumStyles("price", aiLayout?.price ? {
+                                    top: manualPositions.price?.y ? `${manualPositions.price.y}%` : `${aiLayout.price.y ?? 88}%`,
+                                    left: manualPositions.price?.x ? `${manualPositions.price.x}%` : `${aiLayout.price.x ?? 50}%`,
+                                    transform: aiLayout.price.align === 'center' ? 'translateX(-50%)' : 'none',
+                                    textAlign: aiLayout.price.align || 'center',
+                                    color: aiLayout.recommendedColor || '#b45309',
+                                    maxWidth: '88%',
+                                    fontSize: getFontSize(1.6, 'price'),
+                                } : config.price)),
                             writingMode: verticalText.price ? 'vertical-rl' : 'horizontal-tb',
-                            textOrientation: verticalText.price ? 'upright' : 'mixed'
+                            textOrientation: verticalText.price ? 'upright' : 'mixed',
                         }}
                     >
                         <div className="relative group">
                             {price}
                             <div className="absolute -top-10 -right-10 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
-                                <Button onClick={(e) => { e.stopPropagation(); toggleVertical("price"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8" title="縦書き切替"><TypeIcon className="size-4" /></Button>
-                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("price", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8" title="縮小"><Minus className="size-4" /></Button>
-                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("price", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8" title="拡大"><Plus className="size-4" /></Button>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-                {/* 複数商品時のメニューリスト表示 */}
-                {showTextOverlay !== "none" && menuItems.length > 1 && menuItems.some(item => item.name) && (
-                    <motion.div
-                        drag
-                        dragMomentum={false}
-                        onDragEnd={(e, info) => handleDragEnd("menuList", e, info)}
-                        className="absolute z-10 cursor-move group"
-                        style={{
-                            top: manualPositions.menuList?.y ? `${manualPositions.menuList.y}%` : aiLayout?.productName?.y ? `${aiLayout.productName.y}%` : '30%',
-                            left: manualPositions.menuList?.x ? `${manualPositions.menuList.x}%` : '50%',
-                            transform: 'translateX(-50%)',
-                            width: '85%',
-                            color: aiLayout?.recommendedColor || config.productName?.color || '#000'
-                        }}
-                    >
-                        <div className="relative group">
-                            <div className="space-y-1">
-                                {menuItems.filter(item => item.name).map((item, idx) => {
-                                    const sizeRatio = menuItems.length <= 3 ? 2.0 : menuItems.length <= 5 ? 1.5 : menuItems.length <= 7 ? 1.2 : 1.0;
-                                    return (
-                                        <div key={idx} className="flex items-baseline justify-between gap-2" style={{ fontSize: getFontSize(sizeRatio, "menuList") }}>
-                                            <span className="font-black truncate">{item.name}</span>
-                                            <span className="shrink-0 border-b border-dotted border-current opacity-30 flex-1 mx-1" />
-                                            {item.price && <span className="font-black shrink-0 text-amber-700" style={{ color: aiLayout?.recommendedColor || config.price?.color || '#b45309' }}>{formatPrice(item.price)}</span>}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="absolute -top-10 -right-10 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
-                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("menuList", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all" title="縮小"><Minus className="size-4" /></Button>
-                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("menuList", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all" title="拡大"><Plus className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); toggleVertical("price"); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8"><TypeIcon className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("price", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8"><Minus className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("price", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8"><Plus className="size-4" /></Button>
                             </div>
                         </div>
                     </motion.div>
                 )}
 
-                {/* QRコードレイヤー (V6: Superiority) */}
-                {
-                    qrContent && (
-                        <motion.div
-                            drag
-                            dragMomentum={false}
-                            onDragEnd={(e, info) => handleDragEnd("qr", e, info)}
-                            className="absolute z-20 bg-white p-2 rounded-lg shadow-xl border border-slate-200 cursor-move group no-print-bg"
-                            style={{
-                                top: manualPositions.qr?.y ? `${manualPositions.qr.y}%` : '80%',
-                                left: manualPositions.qr?.x ? `${manualPositions.qr.x}%` : '85%',
-                                transform: 'translate(-50%, -50%)'
-                            }}
-                        >
-                            <QRCodeCanvas value={qrContent} size={64} level="H" />
-                        </motion.div>
-                    )
-                }
-            </div >
+                {showTextOverlay !== "none" && menuItems.length > 1 && menuItems.some((item: MenuItem) => item.name) && (
+                    <motion.div
+                        drag
+                        dragMomentum={false}
+                        onDragEnd={(e, info) => handleDragEnd("menuList", e, info)}
+                        className="absolute z-10 cursor-move group"
+                        style={getPremiumStyles("menuList", {
+                            top: manualPositions.menuList?.y ? `${manualPositions.menuList.y}%` : aiLayout?.productName?.y ? `${aiLayout.productName.y}%` : '30%',
+                            left: manualPositions.menuList?.x ? `${manualPositions.menuList.x}%` : '50%',
+                            transform: 'translateX(-50%)',
+                            width: '85%',
+                            color: aiLayout?.recommendedColor || config.productName?.color || '#000'
+                        })}
+                    >
+                        <div className="relative group">
+                            <div className="space-y-1">
+                                {menuItems.filter((item: MenuItem) => item.name).map((item: MenuItem, idx: number) => {
+                                    const sizeRatio = menuItems.length <= 3 ? 2.0 : menuItems.length <= 5 ? 1.5 : menuItems.length <= 7 ? 1.2 : 1.0;
+                                    return (
+                                        <div key={idx} className="flex items-baseline justify-between gap-2" style={{ fontSize: getFontSize(sizeRatio, "menuList") }}>
+                                            <span className="font-black truncate">{item.name}</span>
+                                            <span className="shrink-0 border-b border-dotted border-current opacity-30 flex-1 mx-1" />
+                                            {item.price && <span className="font-black shrink-0" style={{ color: aiLayout?.recommendedColor || config.price?.color || '#b45309' }}>{formatPrice(item.price)}</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div className="absolute -top-10 -right-10 opacity-0 group-hover:opacity-100 flex gap-1 z-30 no-print">
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("menuList", -0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><Minus className="size-4" /></Button>
+                                <Button onClick={(e) => { e.stopPropagation(); handleElementScaleChange("menuList", 0.1); }} className="bg-white shadow-xl border border-slate-100 rounded-full p-2 text-slate-500 hover:text-indigo-600 size-8 transition-all"><Plus className="size-4" /></Button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
+                {qrContent && (
+                    <motion.div
+                        drag
+                        dragMomentum={false}
+                        onDragEnd={(e, info) => handleDragEnd("qr", e, info)}
+                        className="absolute z-20 bg-white p-2 rounded-lg shadow-xl border border-slate-200 cursor-move group no-print-bg"
+                        style={{
+                            top: manualPositions.qr?.y ? `${manualPositions.qr.y}%` : '80%',
+                            left: manualPositions.qr?.x ? `${manualPositions.qr.x}%` : '85%',
+                            transform: 'translate(-50%, -50%)'
+                        }}
+                    >
+                        <QRCodeCanvas value={qrContent} size={64} level="H" />
+                    </motion.div>
+                )}
+            </div>
         );
     };
 
@@ -961,6 +1160,86 @@ export default function PopMakerPage() {
                                 >
                                     <Heart className="size-4" /> お気に入り
                                 </button>
+                                <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
+                                    <DialogTrigger asChild>
+                                        <button
+                                            className="px-6 py-2 rounded-xl text-sm font-black transition-all flex items-center gap-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                        >
+                                            <Sparkles className="size-4" /> 使い方ガイド
+                                        </button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-slate-50 border-none rounded-3xl p-0">
+                                        <div className="p-8 space-y-8">
+                                            <DialogHeader>
+                                                <DialogTitle className="text-3xl font-black text-indigo-600 flex items-center gap-3">
+                                                    <Wand2 className="size-8" />
+                                                    AI POP作成 V2 ガイド
+                                                </DialogTitle>
+                                                <p className="text-slate-500 font-bold mt-2">
+                                                    AIの力を借りて、わずか数分でプロ品質の販促POPを作成しましょう。
+                                                </p>
+                                            </DialogHeader>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <Card className="p-6 bg-white border-0 shadow-sm rounded-2xl space-y-3">
+                                                    <div className="size-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-lg shadow-indigo-200">1</div>
+                                                    <h3 className="font-black text-slate-800">素材をアップロード</h3>
+                                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                        商品写真をアップするか、Canva等で作ったデザイン（画像/PDF）を背景として読み込みます。<b>「AIで枠を検出」</b>ボタンを使えば写真は自動配置されます。
+                                                    </p>
+                                                </Card>
+
+                                                <Card className="p-6 bg-white border-0 shadow-sm rounded-2xl space-y-3">
+                                                    <div className="size-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-lg shadow-indigo-200">2</div>
+                                                    <h3 className="font-black text-slate-800">こだわりを伝える</h3>
+                                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                        「AIでおまかせ」でコピーを作るのも良いですが、<b>「AIと相談」</b>ボタンからチャットや音声で要望（「もっと高級に」等）を伝えると、デザインまで調整してくれます。
+                                                    </p>
+                                                </Card>
+
+                                                <Card className="p-6 bg-white border-0 shadow-sm rounded-2xl space-y-3">
+                                                    <div className="size-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-lg shadow-indigo-200">3</div>
+                                                    <h3 className="font-black text-slate-800">直感的にアレンジ</h3>
+                                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                        プレビュー上の文字は<b>直接ドラッグ</b>で好きな位置に。カーソルを合わせれば<b>「+/-」でサイズ調整</b>や<b>縦書き切替</b>も個別に行えます。
+                                                    </p>
+                                                </Card>
+
+                                                <Card className="p-6 bg-white border-0 shadow-sm rounded-2xl space-y-3">
+                                                    <div className="size-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black shadow-lg shadow-indigo-200">4</div>
+                                                    <h3 className="font-black text-slate-800">保存・印刷・同期</h3>
+                                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                        「印刷 / 保存」で書き出しが可能です。<b>「WEBサイトへ同期」</b>を使えば、作成したPOPを店舗HPに即座に掲載して公開できます。
+                                                    </p>
+                                                </Card>
+                                            </div>
+
+                                            <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl">
+                                                <h3 className="text-xl font-black mb-4 flex items-center gap-2">
+                                                    <Sparkles className="size-6" /> AIだけの特別な機能
+                                                </h3>
+                                                <ul className="space-y-3">
+                                                    <li className="flex items-start gap-3">
+                                                        <Check className="size-5 shrink-0 mt-0.5 text-indigo-200" />
+                                                        <div className="text-sm"><b>クチコミをコピーに変換:</b> Googleマップの良いクチコミを貼り付けるだけで、お客様の声を活かした「売れるコピー」へ瞬時に変換。</div>
+                                                    </li>
+                                                    <li className="flex items-start gap-3">
+                                                        <Check className="size-5 shrink-0 mt-0.5 text-indigo-200" />
+                                                        <div className="text-sm"><b>画像からフォント提案:</b> 背景画像のデザインをAIが読み取り、雰囲気にピッタリなフォントを自動でチョイスします。</div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+
+                                            <div className="text-center pt-4">
+                                                <DialogTrigger asChild>
+                                                    <Button size="lg" className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-12 h-14 font-black shadow-xl transition-all active:scale-95">
+                                                        さっそく作成を始める
+                                                    </Button>
+                                                </DialogTrigger>
+                                            </div>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
                             </div>
                         </header>
 
@@ -982,6 +1261,97 @@ export default function PopMakerPage() {
                             </Card>
                         ) : activeTab === "create" ? (
                             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                {/* 初期選択ダイアログ */}
+                                <Dialog open={isFirstVisit} onOpenChange={setIsFirstVisit}>
+                                    <DialogContent className="sm:max-w-[750px] bg-slate-50 border-none rounded-[40px] p-0 overflow-hidden shadow-2xl">
+                                        <div className="p-10 space-y-10 text-center">
+                                            <div className="space-y-4">
+                                                <div className="inline-flex items-center justify-center size-16 bg-indigo-600 rounded-2xl shadow-xl shadow-indigo-200 mb-2">
+                                                    <Wand2 className="size-8 text-white" />
+                                                </div>
+                                                <h2 className="text-4xl font-black text-slate-900 tracking-tighter">
+                                                    最高の一枚を、どう作りますか？
+                                                </h2>
+                                                <p className="text-slate-500 font-bold">
+                                                    あなたのスタイルに合わせて、AIが最適なサポートをいたします。
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                                {/* 1. 作り方を教わる */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsFirstVisit(false);
+                                                        setIsGuideOpen(true);
+                                                    }}
+                                                    className="group flex flex-col items-center p-6 bg-white rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all border-2 border-transparent hover:border-indigo-500 text-center"
+                                                >
+                                                    <div className="size-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 transition-colors">
+                                                        <Sparkles className="size-6 text-indigo-600 group-hover:text-white" />
+                                                    </div>
+                                                    <h3 className="font-black text-slate-800 mb-2">① 作り方を教わる</h3>
+                                                    <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                                                        まずは基本から。<br />ステップ形式のガイドで<br />操作方法をマスター。
+                                                    </p>
+                                                </button>
+
+                                                {/* 2. 相談しながら作る */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsFirstVisit(false);
+                                                        setIsChatOpen(true);
+                                                    }}
+                                                    className="group flex flex-col items-center p-6 bg-white rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all border-2 border-transparent hover:border-indigo-500 text-center"
+                                                >
+                                                    <div className="size-14 bg-indigo-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 transition-colors">
+                                                        <MessageCircle className="size-6 text-indigo-600 group-hover:text-white" />
+                                                    </div>
+                                                    <h3 className="font-black text-slate-800 mb-2">② 相談しながら</h3>
+                                                    <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                                                        AIと会話しながら、<br />こだわりを形に。<br />納得のいくまで。
+                                                    </p>
+                                                </button>
+
+                                                {/* 3. AIに丸投げする */}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsFirstVisit(false);
+                                                        handleAiDesignAssistant();
+                                                    }}
+                                                    className="group flex flex-col items-center p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-200 hover:-translate-y-2 transition-all text-center"
+                                                >
+                                                    <div className="size-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
+                                                        <Wand2 className="size-6 text-white" />
+                                                    </div>
+                                                    <h3 className="font-black text-white mb-2">③ AIに丸投げ</h3>
+                                                    <p className="text-[10px] text-indigo-100 font-bold leading-relaxed">
+                                                        時間がない時も安心。<br />写真1枚からAIが<br />すべて自動デザイン。
+                                                    </p>
+                                                </button>
+
+                                                {/* 4. 一人でできるもん */}
+                                                <button
+                                                    onClick={() => setIsFirstVisit(false)}
+                                                    className="group flex flex-col items-center p-6 bg-white rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all border-2 border-transparent hover:border-slate-900 text-center"
+                                                >
+                                                    <div className="size-14 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-slate-900 transition-colors">
+                                                        <Zap className="size-6 text-slate-400 group-hover:text-white" />
+                                                    </div>
+                                                    <h3 className="font-black text-slate-800 mb-2">④ 独力で作る</h3>
+                                                    <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                                                        ガイドもAIも不要。<br />己のセンスのみで<br />道を切り拓く。
+                                                    </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="pt-4">
+                                                <p className="text-xs text-slate-400 font-bold">
+                                                    ※ どのボタンを選んでも、後から自由に変更・やり直しが可能です。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
                                 {/* ステップガイド */}
                                 <Card className="border-0 shadow-2xl shadow-slate-200/50 rounded-3xl overflow-hidden p-8 bg-white">
                                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -1192,9 +1562,7 @@ export default function PopMakerPage() {
                                                                 // pdfjs-dist v5 系では動的インポートの挙動に注意が必要
                                                                 // @ts-ignore
                                                                 const pdfjs = await import('pdfjs-dist/build/pdf.mjs');
-                                                                const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.mjs');
-
-                                                                // ワーカーの設定（CDN経由で安定化を図る）
+                                                                // ワーカー設定（CDN経由で安定化）
                                                                 const VERSION = "5.4.624"; // package.json に合わせる
                                                                 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${VERSION}/build/pdf.worker.min.mjs`;
 
@@ -1387,8 +1755,8 @@ export default function PopMakerPage() {
                                                                 {chatMessages.map((msg, i) => (
                                                                     <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                                                                         <div className={`max-w-[85%] rounded-2xl p-4 text-sm shadow-sm ${msg.role === "user"
-                                                                                ? "bg-indigo-600 text-white rounded-tr-none"
-                                                                                : "bg-white text-slate-800 rounded-tl-none border border-slate-100"
+                                                                            ? "bg-indigo-600 text-white rounded-tr-none"
+                                                                            : "bg-white text-slate-800 rounded-tl-none border border-slate-100"
                                                                             }`}>
                                                                             {msg.images && msg.images.length > 0 && (
                                                                                 <div className="grid grid-cols-2 gap-2 mb-2">
@@ -1403,6 +1771,169 @@ export default function PopMakerPage() {
                                                                         </div>
                                                                     </div>
                                                                 ))}
+                                                                {isWizardMode && (
+                                                                    <div className="flex flex-col gap-3 py-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                                                        <div className="flex flex-wrap gap-2 justify-center">
+                                                                            {wizardStep === 1 && (
+                                                                                <>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setWizardPurpose("menu");
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "新メニュー・おすすめ料理" }, { role: "model", content: "楽しみですね！掲載する商品（項目）の数はいくつですか？" }]);
+                                                                                            setWizardStep(2);
+                                                                                        }}
+                                                                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 rounded-xl h-12 shadow-lg"
+                                                                                    >
+                                                                                        新メニュー・おすすめ料理
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setWizardPurpose("info");
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "店内の案内・お知らせ" }, { role: "model", content: "承知しました！掲載する項目（タイトルなど）の数はいくつですか？" }]);
+                                                                                            setWizardStep(2);
+                                                                                        }}
+                                                                                        variant="outline"
+                                                                                        className="border-2 border-indigo-200 text-indigo-600 font-black px-6 rounded-xl h-12"
+                                                                                    >
+                                                                                        店内の案内・お知らせ
+                                                                                    </Button>
+                                                                                </>
+                                                                            )}
+
+                                                                            {wizardStep === 2 && (
+                                                                                <>
+                                                                                    {[1, 2, "3〜10"].map(num => (
+                                                                                        <Button
+                                                                                            key={num}
+                                                                                            onClick={() => {
+                                                                                                const count = typeof num === 'string' ? 3 : num;
+                                                                                                setPromisedItemCount(count);
+                                                                                                setChatMessages(prev => [...prev, { role: "user", content: `${num}点` }, { role: "model", content: `かしこまりました。次に、商品写真はありますか？` }]);
+                                                                                                setWizardStep(3);
+                                                                                            }}
+                                                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 rounded-xl h-12 shadow-lg"
+                                                                                        >
+                                                                                            {num}点
+                                                                                        </Button>
+                                                                                    ))}
+                                                                                </>
+                                                                            )}
+
+                                                                            {wizardStep === 3 && (
+                                                                                <div className="flex flex-col gap-2 w-full max-w-sm mx-auto">
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setPromisedProductImage(true);
+                                                                                            setIsTextOnly(false);
+                                                                                            setPromisedAiImageCount(0);
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "自分で用意した写真を使う" }, { role: "model", content: "ありがとうございます！後ほどアップロードしてくださいね。\n\n最後にデザインの雰囲気を選んでください。" }]);
+                                                                                            setWizardStep(4);
+                                                                                        }}
+                                                                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl h-12 shadow-lg"
+                                                                                    >
+                                                                                        自分で用意した写真を使う
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setPromisedProductImage(false);
+                                                                                            setIsTextOnly(true);
+                                                                                            setPromisedAiImageCount(0);
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "写真はない（文字だけで作る）" }, { role: "model", content: "シンプルで読みやすいデザインにしますね。\n\n最後にデザインの雰囲気を選んでください。" }]);
+                                                                                            setWizardStep(4);
+                                                                                        }}
+                                                                                        variant="outline"
+                                                                                        className="border-2 border-indigo-200 text-indigo-600 font-black rounded-xl h-12"
+                                                                                    >
+                                                                                        写真はない（文字だけで作る）
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setPromisedProductImage(false);
+                                                                                            setIsTextOnly(false);
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "写真はない（AIに画像を作らせる）" }, { role: "model", content: "AIがイメージ画像を生成します！何枚作成しますか？" }]);
+                                                                                            setWizardStep(3.5);
+                                                                                        }}
+                                                                                        variant="outline"
+                                                                                        className="border-2 border-indigo-200 text-indigo-600 font-black rounded-xl h-12"
+                                                                                    >
+                                                                                        写真はない（AIに画像を作らせる）
+                                                                                    </Button>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {wizardStep === 3.5 && (
+                                                                                <>
+                                                                                    {[1, 2].filter(n => n <= promisedItemCount).map(n => (
+                                                                                        <Button
+                                                                                            key={n}
+                                                                                            onClick={() => {
+                                                                                                setPromisedAiImageCount(n);
+                                                                                                setChatMessages(prev => [...prev, { role: "user", content: `${n}枚` }, { role: "model", content: `${n}枚生成しますね。最後にデザインの雰囲気を選んでください。` }]);
+                                                                                                setWizardStep(4);
+                                                                                            }}
+                                                                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 rounded-xl h-12 shadow-lg"
+                                                                                        >
+                                                                                            {n}枚
+                                                                                        </Button>
+                                                                                    ))}
+                                                                                </>
+                                                                            )}
+
+                                                                            {wizardStep === 4 && (
+                                                                                <>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setWizardStyle("washoku");
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "和風・高級感" }, { role: "model", content: "落ち着いた上品なデザインに仕上げます。\n\nこれで準備は万端です！下の「OK」で閉じて、情報を入力してください。" }]);
+                                                                                            setWizardStep(5);
+                                                                                        }}
+                                                                                        className="bg-slate-800 hover:bg-slate-900 text-white font-black px-4 rounded-xl h-12 shadow-lg"
+                                                                                    >
+                                                                                        和風・高級感
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setWizardStyle("pop");
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "ポップ・賑やか" }, { role: "model", content: "元気で目立つデザインにしますね！\n\nこれで準備は万端です！下の「OK」で閉じて、情報を入力してください。" }]);
+                                                                                            setWizardStep(5);
+                                                                                        }}
+                                                                                        className="bg-pink-500 hover:bg-pink-600 text-white font-black px-4 rounded-xl h-12 shadow-lg"
+                                                                                    >
+                                                                                        ポップ・賑やか
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        onClick={() => {
+                                                                                            setWizardStyle("modern");
+                                                                                            setChatMessages(prev => [...prev, { role: "user", content: "モダン・シンプル" }, { role: "model", content: "スッキリとおしゃれなデザインにします。\n\nこれで準備は万端です！下の「OK」で閉じて、情報を入力してください。" }]);
+                                                                                            setWizardStep(5);
+                                                                                        }}
+                                                                                        className="bg-indigo-500 hover:bg-indigo-600 text-white font-black px-4 rounded-xl h-12 shadow-lg"
+                                                                                    >
+                                                                                        モダン・シンプル
+                                                                                    </Button>
+                                                                                </>
+                                                                            )}
+
+                                                                            {wizardStep === 5 && (
+                                                                                <Button
+                                                                                    onClick={() => {
+                                                                                        setWizardCompleted(true);
+                                                                                        setIsChatOpen(false);
+                                                                                        setIsWizardMode(false);
+                                                                                        setWizardStep(0);
+                                                                                    }}
+                                                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-12 rounded-xl h-12 shadow-lg"
+                                                                                >
+                                                                                    OK
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-[10px] text-center text-slate-400 font-bold">
+                                                                            {wizardStep === 5 ? "画面を閉じて、素材や情報の入力へ進みます" : "選択すると次のステップへ進みます"}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+
                                                                 {generating && (
                                                                     <div className="flex justify-start">
                                                                         <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-none p-4 shadow-sm flex items-center gap-2">
