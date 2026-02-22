@@ -126,10 +126,11 @@ export default function MaterialsPage() {
         setIsTranslating(true);
         const loadingToast = toast.loading("AIが高精度翻訳中...");
         try {
+            const token = await getToken();
             const [cEn, nEn, aEn] = await Promise.all([
-                translateToEnglish(catchCopy, "catchphrase"),
-                translateToEnglish(basicInfo.storeName, "general"),
-                translateToEnglish(basicInfo.address, "general")
+                translateToEnglish(catchCopy, "catchphrase", token || undefined),
+                translateToEnglish(basicInfo.storeName, "general", token || undefined),
+                translateToEnglish(basicInfo.address, "general", token || undefined)
             ]);
 
             setCatchCopyEn(cEn);
@@ -146,6 +147,12 @@ export default function MaterialsPage() {
         } finally {
             setIsTranslating(false);
         }
+    };
+
+    const handleAIAdjustment = () => {
+        setIsAdjusting(true);
+        toast.info("キャッチコピーをより魅力的に磨き上げます（現在準備中）");
+        setTimeout(() => setIsAdjusting(false), 1500);
     };
 
     const handleSave = async () => {

@@ -19,7 +19,7 @@ import { AnnouncementList } from "./announcement-list";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface AppSidebarProps {
-    activePage: "dashboard" | "store" | "account" | "plans" | "hp" | "settings" | "pop" | "accounting";
+    activePage: "dashboard" | "store" | "account" | "plans" | "hp" | "settings" | "accounting";
     activeSubPage?: string;
     onSubPageChange?: (page: string) => void;
     user?: any;
@@ -122,18 +122,6 @@ export function AppSidebar({ activePage, activeSubPage, onSubPageChange, user, s
                     )}
                 </div>
 
-                <Link
-                    href="/dashboard/tools/pop-maker"
-                    className={cn(
-                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        activePage === "pop"
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                >
-                    <Sparkles className="size-4 text-amber-500" />
-                    <span>AI POP作成</span>
-                </Link>
                 <Link
                     href="/settings/account"
                     className={cn(

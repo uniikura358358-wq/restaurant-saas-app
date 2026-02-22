@@ -119,7 +119,7 @@ function PlansContent() {
                             <div className="flex flex-col items-start leading-tight">
                                 <span className="text-xl whitespace-nowrap">HP制作パッケージはこちらをクリック</span>
                                 <span className={`text-base font-black whitespace-nowrap ${activeMode === 'hp' ? 'text-orange-100' : 'text-orange-600'}`}>
-                                    初回39800円/維持管理費2980円～
+                                    初回39800円/維持管理費3280円～
                                 </span>
                             </div>
                         </button>
@@ -168,7 +168,7 @@ function PlansContent() {
                                     </div>
                                     <Button
                                         className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl text-lg shadow-lg shadow-blue-100"
-                                        onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.LIGHT.yearly.id : STRIPE_PLANS.LIGHT.id, 'Standard')}
+                                        onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.STANDARD.yearly.id : STRIPE_PLANS.STANDARD.id, 'Standard')}
                                         disabled={!!processingId}
                                     >
                                         選択する
@@ -259,7 +259,7 @@ function PlansContent() {
                                     </div>
                                     <Button
                                         className="w-full h-14 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl text-lg shadow-xl shadow-orange-100"
-                                        onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.BUSINESS.yearly.id : STRIPE_PLANS.BUSINESS.id, 'Pro')}
+                                        onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.PRO.yearly.id : STRIPE_PLANS.PRO.id, 'Pro')}
                                         disabled={!!processingId}
                                     >
                                         今すぐ始める
@@ -347,7 +347,7 @@ function PlansContent() {
                                     </div>
                                     <Button
                                         className="w-full h-14 bg-amber-400 hover:bg-amber-500 text-amber-950 font-black rounded-2xl text-lg shadow-lg shadow-amber-100"
-                                        onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.BUSINESS_PREMIUM.yearly.id : STRIPE_PLANS.BUSINESS_PREMIUM.id, 'Pro Premium')}
+                                        onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.PRO_PREMIUM.yearly.id : STRIPE_PLANS.PRO_PREMIUM.id, 'Pro Premium')}
                                         disabled={!!processingId}
                                     >
                                         プレミアムで始める
@@ -389,6 +389,207 @@ function PlansContent() {
                             </div>
                         </div>
 
+                    </div>
+                )}
+
+                {/* --- View B: HP制作パッケージ --- */}
+                {activeMode === 'hp' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-5 duration-500">
+                        {/* Initial Cost Banner */}
+                        <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-3xl p-8 mb-12 text-white shadow-xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+                                <Globe className="w-48 h-48" />
+                            </div>
+                            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                                <div className="text-center md:text-left">
+                                    <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                                        <span className="bg-white/20 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest backdrop-blur-sm">Official Web Creation</span>
+                                        <Badge className="bg-amber-400 text-amber-950 font-black">2026年最新規格</Badge>
+                                    </div>
+                                    <h2 className="text-4xl md:text-5xl font-black mb-4 tracking-tighter">
+                                        初期費用 <span className="text-amber-400">¥39,800</span> で<br className="sm:hidden" />
+                                        最高峰のHPを制作
+                                    </h2>
+                                    <p className="text-lg md:text-xl font-bold text-orange-50 leading-relaxed max-w-2xl">
+                                        プロのデザイン ＋ 高精度AI集客機能 ＋ インボイス対応収支管理<br />
+                                        全てが揃った「売れるHP」を最短1週間で。
+                                    </p>
+                                    <div className="mt-6 flex flex-wrap gap-4 justify-center md:justify-start">
+                                        <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
+                                            <CheckCircle2 className="w-4 h-4 text-amber-300" />
+                                            <span className="text-sm font-bold">独自ドメイン取得込み</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
+                                            <CheckCircle2 className="w-4 h-4 text-amber-300" />
+                                            <span className="text-sm font-bold">サーバー管理費込み</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
+                                            <CheckCircle2 className="w-4 h-4 text-amber-300" />
+                                            <span className="text-sm font-bold">SSL暗号化完備</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-4 w-full md:w-auto">
+                                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 text-center">
+                                        <div className="text-xs font-black text-orange-200 mb-1">HP制作モード限定特典</div>
+                                        <div className="text-2xl font-black mb-2 flex items-center justify-center gap-2">
+                                            <Sparkles className="w-6 h-6 text-amber-300" />
+                                            AI翻訳ボタンを標準搭載
+                                        </div>
+                                        <p className="text-xs text-orange-50 font-medium">海外観光客の集客に特化した<br />多言語HPが簡単に手に入ります。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Billing Toggle (Same as SaaS) */}
+                        <div className="flex justify-center mb-12">
+                            <div className="flex items-center gap-6 bg-gray-100 rounded-full p-1.5 border border-gray-200 shadow-inner">
+                                <button onClick={() => setBillingCycle('month')} className={`px-8 py-2.5 rounded-full text-sm font-bold transition-all ${billingCycle === 'month' ? 'bg-white text-gray-900 shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>月払い</button>
+                                <button onClick={() => setBillingCycle('year')} className={`px-8 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'year' ? 'bg-orange-500 text-white shadow-md' : 'text-orange-600 hover:text-orange-700'}`}>
+                                    年払い
+                                    <span className={`text-xs px-2 py-1 rounded-full ${billingCycle === 'year' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-700'}`}>
+                                        年払いでさらにお得
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* HP Plans Grid */}
+                        <div className="grid md:grid-cols-4 gap-6 items-stretch mb-12">
+                            {/* web Light */}
+                            <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 flex flex-col p-8 transition-all hover:shadow-2xl hover:-translate-y-1">
+                                <div className="text-center mb-8">
+                                    <h3 className="text-xl font-black text-gray-900 mb-2">web Light</h3>
+                                    <Badge className="bg-gray-50 text-gray-500 border-none font-black px-3 py-0.5 text-[10px] mb-4">HP維持管理 ＋ 最低限のAI</Badge>
+                                    <div className="flex items-baseline justify-center gap-1">
+                                        <span className="text-3xl font-black text-gray-900">¥{billingCycle === 'year' ? '36,080' : '3,280'}</span>
+                                        <span className="text-gray-400 font-bold text-xs">/{billingCycle === 'year' ? '年' : '月'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1 space-y-4 mb-8">
+                                    <div className="flex items-center gap-3 text-[13px] font-bold text-gray-700">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>公式Webサイト制作</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[13px] font-bold text-gray-700">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>ドメイン・サーバー維持</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[13px] font-bold text-gray-700">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>AIおまかせ日替メニュー表示</span>
+                                    </div>
+                                </div>
+                                <Button
+                                    className="w-full h-12 bg-gray-900 hover:bg-black text-white font-black rounded-xl"
+                                    onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.WEB_LIGHT.yearly.id : STRIPE_PLANS.WEB_LIGHT.id, 'web Light')}
+                                    disabled={!!processingId}
+                                >
+                                    選択する
+                                </Button>
+                            </div>
+
+                            {/* web Standard */}
+                            <div className="bg-white rounded-[2rem] shadow-xl border-2 border-orange-500 flex flex-col p-8 transition-all hover:shadow-2xl hover:-translate-y-2 relative scale-105 z-10">
+                                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white font-black px-4 py-1 text-xs">おすすめ</Badge>
+                                <div className="text-center mb-8">
+                                    <h3 className="text-xl font-black text-gray-900 mb-2">web Standard</h3>
+                                    <Badge className="bg-orange-50 text-orange-600 border-none font-black px-3 py-0.5 text-[10px] mb-4">HP制作 ＋ SaaS全機能パック</Badge>
+                                    <div className="flex items-baseline justify-center gap-1">
+                                        <span className="text-3xl font-black text-orange-600">¥{billingCycle === 'year' ? '43,780' : '3,980'}</span>
+                                        <span className="text-gray-400 font-bold text-xs">/{billingCycle === 'year' ? '年' : '月'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1 space-y-4 mb-8">
+                                    <div className="flex items-center gap-3 text-[13px] font-black text-orange-700 bg-orange-50 p-3 rounded-xl">
+                                        <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>HP多言語AI翻訳対応</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[13px] font-bold text-gray-700">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>SaaS(Standard)全機能</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[13px] font-bold text-gray-700">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>AI自動返信・画像生成込</span>
+                                    </div>
+                                </div>
+                                <Button
+                                    className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-xl shadow-lg shadow-orange-100"
+                                    onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.WEB_STANDARD.yearly.id : STRIPE_PLANS.WEB_STANDARD.id, 'web Standard')}
+                                    disabled={!!processingId}
+                                >
+                                    このプランで制作する
+                                </Button>
+                            </div>
+
+                            {/* web Pro */}
+                            <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 flex flex-col p-8 transition-all hover:shadow-2xl hover:-translate-y-1">
+                                <div className="text-center mb-8">
+                                    <h3 className="text-xl font-black text-gray-900 mb-2">web Pro</h3>
+                                    <Badge className="bg-orange-50 text-orange-500 border-none font-black px-3 py-0.5 text-[10px] mb-4">SNS自動化 ＋ HP運用</Badge>
+                                    <div className="flex items-baseline justify-center gap-1">
+                                        <span className="text-3xl font-black text-gray-900">¥{billingCycle === 'year' ? '98,000' : '9,800'}</span>
+                                        <span className="text-gray-400 font-bold text-xs">/{billingCycle === 'year' ? '年' : '月'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1 space-y-4 mb-8 text-[13px] font-bold text-gray-700">
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>web Standardの全機能</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Instagram className="w-4 h-4 text-pink-500 shrink-0" />
+                                        <span>Instagram連携自動投稿</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>AI画像生成 (200枚/月)</span>
+                                    </div>
+                                </div>
+                                <Button
+                                    className="w-full h-12 bg-gray-900 hover:bg-black text-white font-black rounded-xl"
+                                    onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.WEB_PRO.yearly.id : STRIPE_PLANS.WEB_PRO.id, 'web Pro')}
+                                    disabled={!!processingId}
+                                >
+                                    選択する
+                                </Button>
+                            </div>
+
+                            {/* web Pro Premium */}
+                            <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 flex flex-col p-8 transition-all hover:shadow-2xl hover:-translate-y-1">
+                                <div className="text-center mb-8">
+                                    <h3 className="text-xl font-black text-gray-900 mb-2">web Pro Premium</h3>
+                                    <Badge className="bg-amber-50 text-amber-600 border-none font-black px-3 py-0.5 text-[10px] mb-4">トータル経営支援 ＋ HP</Badge>
+                                    <div className="flex items-baseline justify-center gap-1">
+                                        <span className="text-3xl font-black text-gray-900">¥{billingCycle === 'year' ? '148,000' : '14,800'}</span>
+                                        <span className="text-gray-400 font-bold text-xs">/{billingCycle === 'year' ? '年' : '月'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1 space-y-4 mb-8 text-[13px] font-bold text-gray-700">
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>web Proの全機能</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Bot className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>AI売上分析・ライバル監視</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
+                                        <span>POP/メニューAI自動作成</span>
+                                    </div>
+                                </div>
+                                <Button
+                                    className="w-full h-12 bg-gray-900 hover:bg-black text-white font-black rounded-xl"
+                                    onClick={() => handleCheckout(billingCycle === 'year' ? STRIPE_PLANS.WEB_PRO_PREMIUM.yearly.id : STRIPE_PLANS.WEB_PRO_PREMIUM.id, 'web Pro Premium')}
+                                    disabled={!!processingId}
+                                >
+                                    選択する
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 )}
 

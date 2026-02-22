@@ -1,70 +1,15 @@
 # Tasks
 
-- [x] 年払い選択時に「17%お得！」バッジを表示（全プラン） [x]
-- [x] HP制作パッケージ（View B）の価格と単位を支払サイクルに連動 [x]
-- [x] 支払切替スイッチ全体を約15%拡大し操作性を向上 [x]
-- [x] お得バッジへの控えめなバウンスアニメーション追加- **不具合修正**
-  - JSXの閉じタグ不整合による構文エラーを修正し、安定したレンダリングを確保。
-- **料金プランの同期・統一**
-  - 全ての年払い料金を「月額の10ヶ月分」に統一し、販売ページとの整合性を確保。
-  - WEBライト (年払い): ¥43,780 ➔ ¥39,800
-  - WEBスタンダード (年払い): ¥99,960 ➔ ¥98,000
-  - WEBプレミアム (年払い): ¥147,000 ➔ ¥148,000 (一部箇所の誤記修正)
-  - 割引バッジを「月払いより2ヶ月分お得」または「17%お得」に統一。
-- [x] バナー内に「見本のWEBサイトを見る」ボタンを追加
-- [x] View Aのバナーに説明文を追加（区分を明確化：初期費用 ＋ 月額）
-- [x] View B（HP制作モード）の上部に初期費用バナーを追加（区分を明確化：初期費用 ＋ 月額）
-- [x] 動作確認
-- [x] ダッシュボードと報告書の更新
-- [x] 最終完了報告
-- [x] Standard Planの年払い価格を15%オフ(¥99,960)に改定 [x]
-- [x] 通貨記号（¥）と金額の間に適切な余白を追加し視認性を向上 [x]
-- [x] プラン機能一覧の「XXX PLANの全機能
-- [x] **ブランド刷新：プラン名称の全面変更**
-  - [x] `usePlanGuard.ts` の `PLAN_NAMES` 定数置換と正規化ロジック (Done)
-  - [x] `stripe/config.ts` の表示名称（name）置換 (Done)
-  - [x] 指定されたAPIルート（Whop/Instagram等）のプラン識別子同期 (Done)
-  - [x] UI各所の文言置換
-    - [x] `plans/page.tsx` (SaaSプラン) (Done)
-    - [x] `upgrade/page.tsx` (HP制作プラン) (Done)
-    - [x] `CustomerSupportChat.tsx` (チャット回答文) (Done)
-    - [x] `AdminToolbar.tsx` (擬似プラン選択肢) (Done)
-  - [x] ドキュメント・仕様書の刷新
-    - [x] `PRICING_PLANS.md` (内部・外部) (Done)
-    - [x] `Dashboard.md` (内部・外部) (Done)
-    - [x] 日報・タスクトラッカー (Done)
-- [x] 販売ページの特定と正確な料金情報の取得 [x]
-- [x] 実施計画書の作成とユーザー確認依頼 [x]
-- [x] `PRICING_PLANS.md` の更新 [x]
-- [x] `src/app/plans/page.tsx` の更新 [x]
-- [x] `00_経営・戦略/Dashboard.md` の更新 [x]
-- [x] `90_ログ・日報/Task_Tracker.md` の更新 [x]
-- [x] 日報の作成 [x]
-- [x] 日報の作成 [x]
-- [x] 日報の作成 [x]
-- [x] 「プラン選択に戻る」ボタンの改善
-  - [x] デザイン改善案の策定・提案（DESIGN_PROPOSAL.md）
-  - [x] ユーザー要件の確定（2倍サイズ、青色、画像内配置、スクロール追従）
-  - [x] 実装（fixed配置、大型化、カラー変更）
-  - [x] 動作確認
-- [x] プランカード「WEB会員」への機能追加（日替わり自動更新機能搭載の訴求） [plans/page.tsx](file:///c:/Users/SATO/Documents/_ObsidianVault_Hub/restaurant-saas-app/src/app/plans/page.tsx)
-- [x] 指定された文言「日替わり自動更新機能搭載」「更新忘れ防止!! 〜」を適切に改行して実装
-- [x] 全ドキュメントの同期（Task_Tracker, Dashboard, 日報）
-- [x] Geminiモデル別返答品質・コスト検証の実施
-- [x] オーナー指定予算（600円〜3500円）に基づくAI利用上限の再設計
-- [x] AIモデル運用ルール（3 Pro メイン採用）の仕様書への反映
-- [x] 各プランのAIテキスト/画像生成上限の更新
-- [x] **AIモデル運用規則の徹底と503エラー対策**
-  - [x] 実装計画書の作成とユーザー承認 [implementation_plan.md](file:///C:/Users/SATO/.gemini/antigravity/brain/d7c92b52-69e0-47f4-b9db-2b450eb2ef09/implementation_plan.md)
-  - [x] `src/lib/vertex-ai.ts` の修正（Flashモデル優先への基盤変更）
-  - [x] `src/app/api/generate-reply/route.ts` の修正（フォールバック強化）
-  - [x] `src/app/api/instagram/analyze/route.ts` の修正（モデル統一）
-  - [x] `src/lib/ai-quota.ts` の修正（コスト計算の適正化）
-  - [x] 全ドキュメントの同期（Task_Tracker, Dashboard, 日報）
-- [x] **Firebase設定不備（5 NOT_FOUND）の解消とマルチプロジェクト対応**
-  - [x] 実装計画書（V2）の作成と承認 [implementation_plan_v2.md](file:///C:/Users/SATO/.gemini/antigravity/brain/d7c92b52-69e0-47f4-b9db-2b450eb2ef09/implementation_plan_v2.md)
-  - [x] 多重Firebaseプロジェクト構成の実装（Primary/Secondary両対応）
-  - [x] `auth-utils.ts` の二段階認証実装（両方のプロジェクトでログイン可能）
-  - [x] `getDbForUser` ユーティリティによる動的DB選択の実装
-  - [x] 各API（sync, settings, dashboard）の接続エラー保護
-  - [x] 全ドキュメントの同期（Task_Tracker, Dashboard, 日報）
+- [x] 試作・本番切替スイッチと基本 UI の整理
+  - [x] handleAiDesignAssistant のウィザードバイパス実装
+  - [x] 「AIに背景を提案（試作）」ボタンの追加
+  - [x] ビルド確認
+- [x] 背景専門プロンプトとレイアウト API の修正
+  - [x] analyze-layout/route.ts プロンプト強化
+  - [x] generateImageWithNanoBanana 拡張（試作・本番）
+  - [x] 本番生成ボタン（Zapアイコン）の実装
+- [x] Instagram マニュアル投稿方式への完全転換
+  - [x] API投稿の廃止とログ記録化
+  - [x] フロントエンドのコピー＆Instagram遷移フロー実装
+  - [x] ドキュメント（仕様書・管理資料）の同期
+- [ ] 次のタスクへ

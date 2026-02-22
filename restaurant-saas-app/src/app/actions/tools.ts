@@ -1,5 +1,7 @@
 "use server";
 import { getGenerativeModel, AI_POLICY } from "@/lib/vertex-ai";
+import { verifyAuth } from "@/lib/auth-utils";
+import { enforceSubscriptionLock } from "@/lib/subscription-server";
 
 /**
  * AIによるPOP用コピー生成 (Vertex AI版)
@@ -11,7 +13,15 @@ export async function generatePopCopy(data: {
     price: string;
     features: string;
     style: string;
+    idToken?: string;
 }) {
+    // 1. 認証チェック
+    const user = await verifyAuth(data.idToken || "");
+    if (!user) throw new Error("Unauthorized");
+
+    // 2. 購読ステータスによる制限の適用
+    await enforceSubscriptionLock(user.uid, "ai_api");
+
     const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
     let responseText: string | null = null;
     let lastError: any = null;
@@ -90,7 +100,15 @@ export async function generatePopCopy(data: {
 export async function generateReviewCopy(data: {
     review: string;
     productName: string;
+    idToken?: string;
 }) {
+    // 1. 認証チェック
+    const user = await verifyAuth(data.idToken || "");
+    if (!user) throw new Error("Unauthorized");
+
+    // 2. 購読ステータスによる制限の適用
+    await enforceSubscriptionLock(user.uid, "ai_api");
+
     const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
     let responseText: string | null = null;
     let lastError: any = null;
@@ -159,7 +177,14 @@ ${data.productName}
 /**
  * 画像の雰囲気から最適なフォントを提案 (V8: AI Font Matcher)
  */
-export async function suggestFontFromImage(imageBase64: string) {
+export async function suggestFontFromImage(imageBase64: string, idToken?: string) {
+    // 1. 認証チェック
+    const user = await verifyAuth(idToken || "");
+    if (!user) throw new Error("Unauthorized");
+
+    // 2. 購読ステータスによる制限の適用
+    await enforceSubscriptionLock(user.uid, "ai_api");
+
     const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
     let responseText: string | null = null;
     let lastError: any = null;
@@ -229,8 +254,15 @@ export async function suggestFontFromImage(imageBase64: string) {
 /**
  * 高精度AI翻訳 (飲食店・おもてなし・美食に特化)
  */
-export async function translateToEnglish(text: string, context: string = "general") {
+export async function translateToEnglish(text: string, context: string = "general", idToken?: string) {
     if (!text) return "";
+
+    // 1. 認証チェック
+    const user = await verifyAuth(idToken || "");
+    if (!user) throw new Error("Unauthorized");
+
+    // 2. 購読ステータスによる制限の適用
+    await enforceSubscriptionLock(user.uid, "ai_api");
 
     const targetModels = [AI_POLICY.PRIMARY, AI_POLICY.SECONDARY];
     let responseText: string | null = null;

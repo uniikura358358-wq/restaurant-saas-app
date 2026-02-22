@@ -134,7 +134,7 @@ export default function GinzaRamenPage() {
                 {/* Interior Background Image (Hero) */}
                 <div className="absolute inset-0 z-0 bg-black">
                     <Image
-                        src="/images/ginza_interior_final_v2.jpg"
+                        src="/images/generated/ginza_interior.jpg"
                         alt="Ginza Ramen Interior"
                         fill
                         className="object-cover"
@@ -200,9 +200,9 @@ export default function GinzaRamenPage() {
                     >
                         {t.items.map((item, index) => {
                             const images = [
-                                "/images/menu_paitan_final.png",
-                                "/images/menu_soy_final.png",
-                                "/images/menu_wagyu_final.png"
+                                "/images/generated/menu_paitan_final.png",
+                                "/images/generated/menu_soy_final.png",
+                                "/images/generated/menu_wagyu_final.png"
                             ];
                             const imageClasses = [
                                 "object-cover transition-transform duration-700 group-hover:scale-110",

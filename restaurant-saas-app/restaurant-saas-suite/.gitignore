@@ -1,0 +1,19 @@
+# --- Secrets / Local env ---
+.env
+.env.*
+!.env.example
+
+# --- Runtime / logs ---
+logs/
+*.log
+tmp/
+temp/
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+
+# --- Optional build outputs ---
+dist/
+build/
+coverage/

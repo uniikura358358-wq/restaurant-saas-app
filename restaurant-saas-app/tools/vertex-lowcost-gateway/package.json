@@ -1,0 +1,14 @@
+{
+  "name": "vertex-lowcost-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vertex AI Gemini 低コスト設定を毎回強制する検証用ゲートウェイ",
+  "scripts": {
+    "start": "node ./src/generate-low-cost.mjs",
+    "test:run": "node ./src/generate-low-cost.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.42.0"
+  }
+}

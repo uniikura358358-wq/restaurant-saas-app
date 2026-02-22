@@ -1,6 +1,8 @@
 "use server";
 
 import { getGenerativeModel, AI_POLICY } from "@/lib/vertex-ai";
+import { verifyAuth } from "@/lib/auth-utils";
+import { enforceSubscriptionLock } from "@/lib/subscription-server";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
@@ -9,15 +11,36 @@ import { v4 as uuidv4 } from "uuid";
  * ナノバナナ (gemini-2.5-flash-image) を使用した画像生成アクション
  * 
  * @param prompt 画像生成用のプロンプト
+ * @param isProduction 本番用高品質生成フラグ（デフォルト: false = 試作）
  * @returns 生成された画像の公開URL（/images/generated/...）
  */
-export async function generateImageWithNanoBanana(prompt: string) {
+export async function generateImageWithNanoBanana(prompt: string, isProduction: boolean = false, idToken?: string) {
     try {
+        // 1. 認証チェック
+        const user = await verifyAuth(idToken || "");
+        if (!user) {
+            throw new Error("Unauthorized: 認証が必要です");
+        }
+
+        // 2. 購読ステータスによる制限の適用 (1日以上の遅延で遮断)
+        await enforceSubscriptionLock(user.uid, "ai_api");
+
         const model = getGenerativeModel(AI_POLICY.IMAGE);
+
+        // [V2-MOD] 試作・本番に応じたパラメータ制御（将来的な拡張性を保持）
+        const generationConfig = isProduction ? {
+            // 本番用高品質設定 (例: サンプル数、アスペクト比指定など)
+            // 現在の Gemini 2.5 Flash Image では基本 1枚だが、構造を分離
+            candidateCount: 1,
+        } : {
+            // 試作・最速設定
+            candidateCount: 1,
+        };
 
         // 画像生成リクエスト
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig
         });
 
         const response = (result as any).response;

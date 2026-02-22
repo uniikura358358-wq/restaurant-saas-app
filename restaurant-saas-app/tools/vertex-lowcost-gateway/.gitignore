@@ -1,0 +1,8 @@
+﻿node_modules/
+.env
+*.log
+
+# 鍵ファイルは基本プロジェクト外に置く（念のため除外）
+*.json
+!package.json
+!package-lock.json
